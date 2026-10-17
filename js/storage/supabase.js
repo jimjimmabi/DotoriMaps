@@ -11,7 +11,6 @@ const sb = window.supabase.createClient(
 );
 
 const MAX_ILCHON = 12;
-const MAX_GROUP_MEMBERS = 8;
 
 // ---------- Auth & Profile ----------
 async function createAcorn(nickname) {
@@ -26,44 +25,24 @@ async function createAcorn(nickname) {
     userId = authData.user.id;
   }
 
-  const { data: existingProfile } = await sb
-    .from('profiles')
-    .select('*')
-    .eq('id', userId)
-    .single();
+  const { data: existingProfile } = await sb.from('profiles').select('*').eq('id', userId).single();
 
   if (existingProfile) {
-    const { data: updated, error: updateError } = await sb
-      .from('profiles')
-      .update({ nickname })
-      .eq('id', userId)
-      .select()
-      .single();
+    const { data: updated, error: updateError } = await sb.from('profiles').update({ nickname }).eq('id', userId).select().single();
     if (updateError) {
       if (updateError.code === '23505') throw new Error('이미 누군가 사용하고 있는 닉네임이에요.');
       throw updateError;
     }
-    localStorage.setItem('dotori_session', JSON.stringify({
-      loggedIn: true, dotori_id: updated.dotori_id, user_id: updated.id, is_owner: true
-    }));
+    localStorage.setItem('dotori_session', JSON.stringify({ loggedIn: true, dotori_id: updated.dotori_id, user_id: updated.id, is_owner: true }));
     localStorage.setItem('dotori_my_id', updated.dotori_id);
     return updated;
   }
 
   const dotoriId = 'dotori-' + Math.random().toString(36).substring(2, 6);
-  const { data: profile, error: profileError } = await sb
-    .from('profiles')
-    .insert([{
-      id: userId,
-      dotori_id: dotoriId,
-      nickname,
-      status_message: '오늘도 화이팅 ♡',
-      mini_me: '🌰',
-      mini_me_bg: '#EAF6FF',
-      tastes: { interests: [], music: [], mood: [], favorites: '', currently: '', needs: '' }
-    }])
-    .select()
-    .single();
+  const { data: profile, error: profileError } = await sb.from('profiles').insert([{
+    id: userId, dotori_id: dotoriId, nickname, status_message: '오늘도 화이팅 ♡', mini_me: '🌰', mini_me_bg: '#EAF6FF',
+    tastes: { interests: [], music: [], mood: [], favorites: '', currently: '', needs: '' }
+  }]).select().single();
 
   if (profileError) {
     if (profileError.code === '23505') throw new Error('이미 누군가 사용하고 있는 닉네임이에요.');
@@ -71,22 +50,25 @@ async function createAcorn(nickname) {
   }
 
   await sb.from('rooms').insert([{ user_id: userId }]);
-
-  localStorage.setItem('dotori_session', JSON.stringify({
-    loggedIn: true, dotori_id: dotoriId, user_id: userId, is_owner: true
-  }));
+  localStorage.setItem('dotori_session', JSON.stringify({ loggedIn: true, dotori_id: dotoriId, user_id: userId, is_owner: true }));
   localStorage.setItem('dotori_my_id', dotoriId);
   return profile;
 }
 
+async function loadAcorn() {
+  const { data: { session } } = await sb.auth.getSession();
+  if (!session) return null;
+  const { data, error } = await sb.from('profiles').select('*').eq('id', session.user.id).single();
+  if (error) return null;
+  
+  localStorage.setItem('dotori_session', JSON.stringify({ loggedIn: true, dotori_id: data.dotori_id, user_id: data.id, is_owner: true }));
+  localStorage.setItem('dotori_my_id', data.dotori_id);
+  return data;
+}
+
 async function loginByDotoriId(dotoriId) {
   const cleaned = String(dotoriId).trim().toLowerCase();
-  const { data: profile, error } = await sb
-    .from('profiles')
-    .select('*')
-    .eq('dotori_id', cleaned)
-    .single();
-
+  const { data: profile, error } = await sb.from('profiles').select('*').eq('dotori_id', cleaned).single();
   if (error || !profile) return null;
 
   const { data: { session } } = await sb.auth.getSession();
@@ -96,9 +78,7 @@ async function loginByDotoriId(dotoriId) {
   }
 
   localStorage.setItem('dotori_my_id', profile.dotori_id);
-  localStorage.setItem('dotori_session', JSON.stringify({
-    loggedIn: true, dotori_id: profile.dotori_id, user_id: profile.id, is_owner: true
-  }));
+  localStorage.setItem('dotori_session', JSON.stringify({ loggedIn: true, dotori_id: profile.dotori_id, user_id: profile.id, is_owner: true }));
   return profile;
 }
 
@@ -152,7 +132,7 @@ async function logout() {
   localStorage.removeItem('dotori_session');
 }
 
-// ---------- Data Sync (Room, Guestbook, etc) ----------
+// ---------- Data Sync (Room & BGM) ----------
 async function getRoom() {
   const { data: { user } } = await sb.auth.getUser();
   if (!user) return { layout: {}, wallpaper: 'default', floor: 'default', bgm_choice: null };
@@ -161,15 +141,20 @@ async function getRoom() {
   return data;
 }
 
+async function getRoomByDotoriId(dotoriId) {
+  const owner = await getProfileByDotoriId(dotoriId);
+  if (!owner) return null;
+  const { data, error } = await sb.from('rooms').select('*').eq('user_id', owner.id).single();
+  if (error) return { layout: {}, wallpaper: 'default', floor: 'default', bgm_choice: null };
+  return data;
+}
+
 async function saveMyRoom(room) {
   const { data: { user } } = await sb.auth.getUser();
   if (!user) return false;
   const { error } = await sb.from('rooms').update({
-    layout: room.layout || {},
-    wallpaper: room.wallpaper || 'default',
-    floor: room.floor || 'default',
-    bgm_choice: room.bgm_choice || null,
-    updated_at: new Date().toISOString()
+    layout: room.layout || {}, wallpaper: room.wallpaper || 'default', floor: room.floor || 'default',
+    bgm_choice: room.bgm_choice || null, updated_at: new Date().toISOString()
   }).eq('user_id', user.id);
   return !error;
 }
@@ -178,19 +163,39 @@ async function saveMyBGM(choiceId) {
   const { data: { user } } = await sb.auth.getUser();
   if (!user) return false;
   const { error } = await sb.from('rooms').update({
-    bgm_choice: choiceId || null,
-    updated_at: new Date().toISOString()
+    bgm_choice: choiceId || null, updated_at: new Date().toISOString()
   }).eq('user_id', user.id);
   return !error;
 }
 
+// ---------- Explore & Friends ----------
 async function getAllProfiles() {
   const { data, error } = await sb.from('profiles')
     .select('dotori_id, nickname, status_message, mini_me, mini_me_bg, tastes, birthday, created_at')
-    .order('created_at', { ascending: false })
-    .limit(100);
+    .order('created_at', { ascending: false }).limit(100);
   if (error) return [];
   return data;
+}
+
+async function getIlchon() {
+  const me = await getProfile();
+  if (!me) return [];
+  const { data, error } = await sb.from('ilchon').select('*').or(`user_a.eq.${me.id},user_b.eq.${me.id}`);
+  if (error) return [];
+  const friendIds = data.map(row => row.user_a === me.id ? row.user_b : row.user_a);
+  if (friendIds.length === 0) return [];
+  const { data: friends } = await sb.from('profiles').select('id, dotori_id, nickname, mini_me, mini_me_bg, status_message').in('id', friendIds);
+  return friends || [];
+}
+
+async function isIlchon(dotoriId) {
+  const me = await getProfile();
+  if (!me) return false;
+  const other = await getProfileByDotoriId(dotoriId);
+  if (!other) return false;
+  const [a, b] = [me.id, other.id].sort();
+  const { data, error } = await sb.from('ilchon').select('*').eq('user_a', a).eq('user_b', b).maybeSingle();
+  return !!data;
 }
 
 // ---------- Match Score (Includes Birthday) ----------
@@ -220,9 +225,10 @@ function calculateMatch(myTastes, theirTastes, myBirthday, theirBirthday) {
   return { score: Math.min(score, 100), reasons };
 }
 
-// Expose to window
+// ---------- Export to Window ----------
 window.DotoriSupabase = {
-  MAX_ILCHON, MAX_GROUP_MEMBERS,
-  createAcorn, loginByDotoriId, getMyAcorn, getProfile, getProfileByDotoriId, updateProfile, getSession, logout,
-  getRoom, saveMyRoom, saveMyBGM, getAllProfiles, calculateMatch
+  MAX_ILCHON,
+  createAcorn, loadAcorn, loginByDotoriId, getMyAcorn, getProfile, getProfileByDotoriId, updateProfile, getSession, logout,
+  getRoom, getRoomByDotoriId, saveMyRoom, saveMyBGM,
+  getAllProfiles, getIlchon, isIlchon, calculateMatch
 };
