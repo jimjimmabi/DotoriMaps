@@ -4,7 +4,12 @@
 
 // 1. Init Map (Center on Seoul)
 const map = L.map('map').setView([37.5665, 126.9780], 13);
-L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '&copy; OpenStreetMap' }).addTo(map);
+
+// Add OpenStreetMap Tiles
+L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { 
+  maxZoom: 19, 
+  attribution: '&copy; OpenStreetMap contributors' 
+}).addTo(map);
 
 const acornIcon = L.divIcon({ className: 'acorn-marker', html: '<div></div>', iconSize: [18, 18], iconAnchor: [9, 9] });
 
@@ -15,17 +20,27 @@ const routingControl = L.Routing.control({
   createMarker: function(i, wp, nWps) { return L.marker(wp.latLng, { icon: acornIcon }); }
 }).addTo(map);
 
-// 2. Tab Switching Logic
-function switchTab(tabName) {
+// 2. Tab Switching Logic (Fixed)
+function switchTab(event, tabName) {
   document.querySelectorAll('.sidebar-tab').forEach(t => t.classList.remove('active'));
   document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
   
-  // Find the clicked tab and activate it
-  event.currentTarget.classList.add('active');
-  document.getElementById(`tab-${tabName}`).classList.add('active');
+  // If the event exists, add active to clicked tab
+  if (event && event.currentTarget) {
+    event.currentTarget.classList.add('active');
+  }
+  
+  const targetTab = document.getElementById(`tab-${tabName}`);
+  if (targetTab) targetTab.classList.add('active');
 }
 
-// 3. Search Logic
+// 3. Home Tab Recommendations
+function flyToPlace(lat, lon, name) {
+  map.flyTo([lat, lon], 15, { duration: 1.5 });
+  L.marker([lat, lon], { icon: acornIcon }).addTo(map).bindPopup(name).openPopup();
+}
+
+// 4. Search Logic
 let searchTimeout;
 async function searchLocations(query, resultContainerId) {
   const container = document.getElementById(resultContainerId);
@@ -58,7 +73,7 @@ async function searchLocations(query, resultContainerId) {
 }
 
 function selectLocation(lat, lon, name, containerId) {
-  map.setView([lat, lon], 16);
+  map.flyTo([lat, lon], 16);
   L.marker([lat, lon], { icon: acornIcon }).addTo(map).bindPopup(name).openPopup();
   
   const inputId = containerId.replace('-results', '-input');
@@ -66,7 +81,7 @@ function selectLocation(lat, lon, name, containerId) {
   document.getElementById(containerId).style.display = 'none';
 }
 
-// 4. Directions Logic
+// 5. Directions Logic
 async function getDirections() {
   const start = document.getElementById('start-input').value;
   const end = document.getElementById('end-input').value;
@@ -88,12 +103,14 @@ async function getDirections() {
   }
 }
 
-// 5. Authentication Logic
+// 6. Authentication Logic
 window.addEventListener('DOMContentLoaded', async () => {
   try {
     const profile = await DotoriStorage.getMyAcorn();
     if (profile) updateMapLoginButton(profile);
-  } catch (e) {}
+  } catch (e) {
+    console.log("Auth check skipped.");
+  }
 });
 
 function updateMapLoginButton(profile) {
