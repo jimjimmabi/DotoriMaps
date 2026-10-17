@@ -1,360 +1,184 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>DotoriMaps</title>
-
-    <!-- Leaflet CSS -->
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
-
-    <style>
-        /* Dotori Forest 2008 Aesthetic */
-        :root {
-            --bg: #F5F5F5; --panel: #FFFFFF; --border: #E5E5E5;
-            --pink: #FF9EC4; --pink-dark: #E87BA8; --acorn-dark: #8B5E2E;
-            --cream: #FFF8F0; --text: #333333; --kakao-blue: #3b82f6;
-        }
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        html, body { height: 100%; font-family: 'Dotum', '돋움', sans-serif; background: var(--bg); overflow: hidden; display: flex; }
-
-        /* Left Sidebar (Kakao Style) */
-        .sidebar {
-            width: 350px;
-            height: 100vh;
-            background: var(--panel);
-            border-right: 1px solid var(--border);
-            display: flex;
-            flex-direction: column;
-            z-index: 1000;
-            box-shadow: 2px 0 10px rgba(0,0,0,0.05);
-        }
-
-        /* Sidebar Header */
-        .sidebar-header {
-            background: var(--kakao-blue);
-            color: #FFF;
-            padding: 16px;
-            font-size: 20px;
-            font-weight: bold;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-        
-        /* Sidebar Tabs */
-        .sidebar-tabs {
-            display: flex;
-            border-bottom: 1px solid var(--border);
-        }
-        .sidebar-tab {
-            flex: 1;
-            padding: 12px 0;
-            text-align: center;
-            font-size: 13px;
-            font-weight: bold;
-            color: #888;
-            cursor: pointer;
-            border-bottom: 2px solid transparent;
-        }
-        .sidebar-tab.active {
-            color: var(--kakao-blue);
-            border-bottom-color: var(--kakao-blue);
-        }
-
-        /* Tab Content */
-        .tab-content {
-            flex: 1;
-            overflow-y: auto;
-            padding: 16px;
-            display: none;
-            flex-direction: column;
-            gap: 16px;
-        }
-        .tab-content.active { display: flex; }
-
-        /* Inputs */
-        .input-group { display: flex; flex-direction: column; gap: 6px; position: relative; }
-        .input-group label { font-size: 11px; color: var(--acorn-dark); font-weight: bold; }
-        .search-box {
-            width: 100%; padding: 10px 12px; border: 1px solid var(--border);
-            border-radius: 6px; background: var(--cream); font-size: 13px;
-            outline: none; font-family: inherit;
-            transition: border 0.2s;
-        }
-        .search-box:focus { border-color: var(--kakao-blue); background: #FFFFFF; }
-
-        /* Search Results Dropdown */
-        .search-results-list {
-            position: absolute; top: 100%; left: 0; right: 0;
-            background: #FFF; border: 1px solid var(--border);
-            border-radius: 6px; max-height: 200px; overflow-y: auto;
-            z-index: 1010; display: none; flex-direction: column;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.1); margin-top: 4px;
-        }
-        .search-result-item {
-            padding: 10px 12px; font-size: 12px; color: var(--text);
-            border-bottom: 1px solid #EEE; cursor: pointer;
-        }
-        .search-result-item:hover { background: #F0F4F9; color: var(--kakao-blue); }
-
-        /* Buttons */
-        .dotori-btn {
-            padding: 12px; background: var(--kakao-blue);
-            border: none; border-radius: 6px;
-            color: #FFFFFF; font-size: 14px; font-weight: bold;
-            cursor: pointer; text-align: center; transition: background 0.1s;
-        }
-        .dotori-btn:hover { background: #2563eb; }
-        .dotori-btn:active { transform: translateY(1px); }
-
-        /* Transit Icons (Mockup) */
-        .transit-options {
-            display: flex; justify-content: space-around;
-            background: var(--cream); padding: 12px; border-radius: 8px;
-            border: 1px solid var(--border);
-        }
-        .transit-icon {
-            font-size: 24px; cursor: pointer; opacity: 0.4; transition: opacity 0.2s;
-        }
-        .transit-icon.active { opacity: 1; }
-
-        /* Map Container */
-        #map { flex: 1; height: 100vh; z-index: 1; }
-
-        /* Floating Toolbox (Right) */
-        .map-toolbox {
-            position: absolute; top: 16px; right: 16px; z-index: 1000;
-            background: #FFF; border-radius: 8px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-            display: flex; flex-direction: column; overflow: hidden;
-            border: 1px solid var(--border);
-        }
-        .toolbox-btn {
-            padding: 10px 14px; background: #FFF; border: none;
-            border-bottom: 1px solid var(--border); cursor: pointer;
-            font-size: 16px; color: var(--text);
-        }
-        .toolbox-btn:last-child { border-bottom: none; }
-        .toolbox-btn:hover { background: #F0F4F9; }
-
-        .leaflet-routing-container { display: none !important; }
-        .acorn-marker div {
-            width: 18px; height: 18px; background: #b8860b;
-            border: 3px solid #fff; border-radius: 50%;
-            box-shadow: 0 2px 6px rgba(0,0,0,0.35);
-        }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Acorn Forest — Dotori</title>
+  <link rel="stylesheet" href="css/reset.css">
+  <link rel="stylesheet" href="css/2008.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
 
-    <!-- Left Sidebar -->
-    <div class="sidebar">
-        <div class="sidebar-header">
-            🌰 DotoriMaps
-        </div>
-        <div class="sidebar-tabs">
-            <div class="sidebar-tab active" data-target="tab-search">Search</div>
-            <div class="sidebar-tab" data-target="tab-directions">Directions</div>
-            <div class="sidebar-tab" data-target="tab-my">MY</div>
-        </div>
-
-        <!-- Search Tab -->
-        <div class="tab-content active" id="tab-search">
-            <div class="input-group">
-                <label>장소, 주소 검색 (Search Place)</label>
-                <input type="text" id="search-input" class="search-box" placeholder="예: Tokyo, Seoul Station..." />
-                <div id="search-results" class="search-results-list"></div>
-            </div>
-        </div>
-
-        <!-- Directions Tab -->
-        <div class="tab-content" id="tab-directions">
-            <div class="transit-options">
-                <div class="transit-icon active" title="Car">🚗</div>
-                <div class="transit-icon" title="Walk">🚶</div>
-                <div class="transit-icon" title="Bike">🚲</div>
-                <div class="transit-icon" title="Transit">🚌</div>
-            </div>
-            <div class="input-group">
-                <label>출발지 (Start)</label>
-                <input type="text" id="start-input" class="search-box" placeholder="출발지 입력" />
-                <div id="start-results" class="search-results-list"></div>
-            </div>
-            <div class="input-group">
-                <label>도착지 (Destination)</label>
-                <input type="text" id="end-input" class="search-box" placeholder="도착지 입력" />
-                <div id="end-results" class="search-results-list"></div>
-            </div>
-            <button id="route-btn" class="dotori-btn">길찾기 (Get Directions)</button>
-        </div>
-
-        <!-- My Tab -->
-        <div class="tab-content" id="tab-my">
-            <div class="input-group">
-                <label>My Location</label>
-                <button id="locate-btn" class="dotori-btn" style="background: var(--acorn-dark);">📍 내 위치 찾기 (Find Me)</button>
-            </div>
-        </div>
+  <!-- ===== WELCOME SCREEN (Login) ===== -->
+  <div id="welcome-screen">
+    <div class="welcome-box">
+      <div class="welcome-logo">
+        <span class="acorn">🌰</span>
+        <h1>도토리숲</h1>
+        <p class="welcome-sub">Dotorisup</p>
+      </div>
+      <p class="welcome-tagline">도토리를 모으는 작은 숲</p>
+      
+      <div class="welcome-form">
+        <label for="nickname-input">닉네임</label>
+        <input type="text" id="nickname-input" maxlength="12" placeholder="숲에서 사용할 이름" autocomplete="off">
+        <button id="create-acorn-btn">🌰 새 도토리 만들기</button>
+      </div>
+      
+      <div class="welcome-load">
+        <span>이미 도토리가 있나요?</span>
+        <button id="load-acorn-btn" class="link-btn">내 도토리 불러오기</button>
+        <span class="welcome-sep">·</span>
+        <button id="visit-acorn-btn" class="link-btn">도토리 ID로 들어가기</button>
+      </div>
+      
+      <p class="welcome-dedication">
+        이 숲은 한 사람에게 바칩니다.<br>
+        외로웠던 저에게, 친구가 되어준 그 사람에게.<br>
+        그 사람이 알려줬어요. 세상에, 진짜로 당신을 걱정하는 사람이 있다는 걸.
+      </p>
     </div>
+  </div>
 
-    <!-- Map -->
-    <div id="map"></div>
+  <!-- ===== MAIN SITE (Matches your screenshots) ===== -->
+  <div id="main-site" class="hidden">
+    
+    <!-- Top Navigation Bar -->
+    <header class="site-header">
+      <div class="header-top">
+        <div class="header-title">
+          <button id="friends-toggle-btn" class="friends-toggle" title="일촌 목록">
+            ☰ <span id="friends-badge" class="friends-badge hidden">0</span>
+          </button>
+          <span class="acorn">🌰</span>
+          <a href="#" id="home-link">Acorn Forest</a>
+        </div>
+        <div class="header-right">
+          <span class="header-date" id="header-date">March 14, 2008</span>
+          <span class="header-divider">|</span>
+          <a href="#" id="inbox-link" class="header-icon">✉ <span id="inbox-count">0</span></a>
+          <a href="#" id="settings-link" class="header-icon">⚙</a>
+          <a href="#" id="logout-link" class="header-icon">✕</a>
+        </div>
+      </div>
+      
+      <!-- Tabs -->
+      <nav class="site-tabs">
+        <a href="#" data-tab="home" class="tab active">home</a>
+        <a href="#" data-tab="room" class="tab">Miniroom</a>
+        <a href="#" data-tab="album" class="tab">Photo Album</a>
+        <a href="#" data-tab="guestbook" class="tab">Guestbook</a>
+        <a href="#" data-tab="plaza" class="tab">Acorn Square</a>
+        <a href="#" data-tab="taste" class="tab">Finding your taste</a>
+      </nav>
+    </header>
 
-    <!-- Floating Toolbox -->
-    <div class="map-toolbox">
-        <button class="toolbox-btn" id="zoom-in" title="Zoom In">➕</button>
-        <button class="toolbox-btn" id="zoom-out" title="Zoom Out">➖</button>
-    </div>
+    <!-- Main Content -->
+    <main class="site-main">
+      
+      <!-- HOME TAB (Screenshot 4) -->
+      <section id="tab-home" class="tab-content active">
+        <div class="home-layout">
+          
+          <!-- Left Column: Mini-Me -->
+          <div class="home-left">
+            <div class="panel mini-me-panel">
+              <div class="mini-me-box" id="mini-me-box">
+                <span class="mini-me-emoji">🌰</span>
+              </div>
+              <div class="mini-me-name" id="mini-me-name">Jms.bs</div>
+              <div class="mini-me-status" id="mini-me-status">Let's do our best today too ♡</div>
+              <div class="mini-me-birthday hidden" id="mini-me-birthday"></div>
+              <button id="profile-edit-btn" class="small-btn" style="margin-top:8px; width:100%;">Edit Profile</button>
+            </div>
+            <div class="panel counter-panel">
+              <div class="counter-row"><span>Today</span><span id="counter-today">7</span></div>
+              <div class="counter-row"><span>Total</span><span id="counter-total">21</span></div>
+            </div>
+            <div class="panel ilchon-panel">
+              <div class="panel-title">first cousin</div>
+              <div class="ilchon-count"><span id="ilchon-count">1</span> people</div>
+            </div>
+          </div>
 
-    <!-- Scripts -->
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.js"></script>
-
-    <script>
-        // 1. Init Map
-        const map = L.map('map').setView([37.5665, 126.9780], 13);
-
-        L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            maxZoom: 19,
-            attribution: '&copy; OpenStreetMap contributors'
-        }).addTo(map);
-
-        // Custom Acorn Marker
-        const acornIcon = L.divIcon({
-            className: 'acorn-marker',
-            html: `<div></div>`,
-            iconSize: [18, 18],
-            iconAnchor: [9, 9]
-        });
-
-        // Routing Machine Setup
-        const routingControl = L.Routing.control({
-            waypoints: [],
-            router: L.Routing.osrmv1({ serviceUrl: 'https://router.project-osrm.org/route/v1' }),
-            lineOptions: { styles: [{ color: '#FF9EC4', weight: 5, opacity: 0.8 }] },
-            createMarker: function(i, wp, nWps) { return L.marker(wp.latLng, { icon: acornIcon }); }
-        }).addTo(map);
-
-        // 2. Sidebar Tabs Logic
-        document.querySelectorAll('.sidebar-tab').forEach(tab => {
-            tab.addEventListener('click', () => {
-                document.querySelectorAll('.sidebar-tab').forEach(t => t.classList.remove('active'));
-                document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
-                tab.classList.add('active');
-                document.getElementById(tab.dataset.target).classList.add('active');
-            });
-        });
-
-        // 3. Floating Toolbox Logic
-        document.getElementById('zoom-in').addEventListener('click', () => map.zoomIn());
-        document.getElementById('zoom-out').addEventListener('click', () => map.zoomOut());
-
-        // 4. Debounced Search Function (Fixes Rate Limit Errors)
-        let searchTimeout;
-        async function searchLocations(query, resultContainerId) {
-            const container = document.getElementById(resultContainerId);
-            if (!query || query.length < 2) { container.style.display = 'none'; return; }
+          <!-- Center Column: BGM, Status, Taste, Room -->
+          <div class="home-center">
+            <div class="panel bgm-panel">
+              <div class="panel-title">Background Music</div>
+              <div class="bgm-player">
+                <button id="bgm-play-btn" class="bgm-btn">▶</button>
+                <span id="bgm-title" class="bgm-title">— Please select a song —</span>
+              </div>
+              <button id="bgm-select-btn" class="small-btn">BGM settings</button>
+            </div>
             
-            container.innerHTML = '<div class="search-result-item">검색 중...</div>';
-            container.style.display = 'flex';
+            <div class="panel status-panel">
+              <div class="panel-title">Status message</div>
+              <div class="status-display" id="status-display">Let's do our best today too ♡</div>
+              <button id="status-edit-btn" class="small-btn">correction</button>
+            </div>
+            
+            <div class="panel taste-preview-panel">
+              <div class="panel-title">Finding your taste</div>
+              <div id="taste-preview"></div>
+              <div style="margin-top:8px; display:flex; gap:6px;">
+                <button id="taste-edit-btn" class="small-btn">Edit preferences</button>
+                <button id="taste-go-btn" class="small-btn">🌱 Finding Your Taste</button>
+              </div>
+            </div>
 
-            clearTimeout(searchTimeout);
-            searchTimeout = setTimeout(async () => {
-                try {
-                    const url = `https://nominatim.openstreetmap.org/search?format=json&limit=5&q=${encodeURIComponent(query)}`;
-                    const res = await fetch(url, { headers: { 'Accept': 'application/json', 'User-Agent': 'DotoriMaps/1.0' } });
-                    
-                    if (!res.ok) throw new Error('Network response was not ok');
-                    
-                    const data = await res.json();
+            <div class="panel home-room-panel">
+              <div class="panel-title">My Miniroom</div>
+              <div id="home-room-preview" class="home-room-preview"></div>
+              <button id="home-room-go-btn" class="small-btn" style="margin-top:8px; width:100%;">🏠 Decorating a Mini Room</button>
+            </div>
+          </div>
 
-                    if (data && data.length > 0) {
-                        container.innerHTML = data.map(item => 
-                            `<div class="search-result-item" data-lat="${item.lat}" data-lon="${item.lon}">${item.display_name}</div>`
-                        ).join('');
-                        
-                        container.querySelectorAll('.search-result-item').forEach(item => {
-                            item.addEventListener('click', () => {
-                                const lat = parseFloat(item.dataset.lat);
-                                const lon = parseFloat(item.dataset.lon);
-                                map.setView([lat, lon], 16);
-                                L.marker([lat, lon], { icon: acornIcon }).addTo(map).bindPopup(item.textContent).openPopup();
-                                
-                                const inputId = resultContainerId === 'start-results' ? 'start-input' : (resultContainerId === 'end-results' ? 'end-input' : 'search-input');
-                                document.getElementById(inputId).value = item.textContent.split(',')[0];
-                                container.style.display = 'none';
-                            });
-                        });
-                    } else {
-                        container.innerHTML = '<div class="search-result-item">결과 없음 (No results)</div>';
-                    }
-                } catch (err) {
-                    container.innerHTML = '<div class="search-result-item">검색 오류 (Server busy, try again)</div>';
-                }
-            }, 600); // Waits 600ms after you stop typing
-        }
+          <!-- Right Column: Guestbook -->
+          <div class="home-right">
+            <div class="panel guestbook-preview-panel">
+              <div class="panel-title">Recent Guestbook</div>
+              <div id="guestbook-preview" class="guestbook-preview">
+                <p class="empty-message">The guestbook is still empty.</p>
+              </div>
+              <button id="guestbook-write-btn" class="small-btn" style="margin-top:8px; width:100%;">Leave a message in the guestbook</button>
+            </div>
+          </div>
+          
+        </div>
+      </section>
 
-        // Attach search to inputs
-        document.getElementById('search-input').addEventListener('input', (e) => searchLocations(e.target.value, 'search-results'));
-        document.getElementById('start-input').addEventListener('input', (e) => searchLocations(e.target.value, 'start-results'));
-        document.getElementById('end-input').addEventListener('input', (e) => searchLocations(e.target.value, 'end-results'));
+      <!-- PLACEHOLDERS FOR OTHER TABS -->
+      <section id="tab-room" class="tab-content"><div class="panel placeholder-panel"><h2>Miniroom</h2><p>Loading...</p></div></section>
+      <section id="tab-album" class="tab-content"><div class="panel placeholder-panel"><h2>Photo Album</h2><p>Loading...</p></div></section>
+      <section id="tab-guestbook" class="tab-content"><div class="panel placeholder-panel"><h2>Guestbook</h2><p>Loading...</p></div></section>
+      <section id="tab-plaza" class="tab-content"><div class="panel placeholder-panel"><h2>Acorn Square</h2><p>Loading...</p></div></section>
+      <section id="tab-taste" class="tab-content"><div class="panel placeholder-panel"><h2>Finding your taste</h2><p>Loading...</p></div></section>
+      
+    </main>
 
-        // 5. Get Directions
-        document.getElementById('route-btn').addEventListener('click', async () => {
-            const startText = document.getElementById('start-input').value.trim();
-            const endText = document.getElementById('end-input').value.trim();
-            if (!startText || !endText) { alert('출발지와 도착지를 모두 입력해주세요.'); return; }
+    <footer class="site-footer">
+      <span class="time-capsule-link" id="time-capsule-link">[ Saved time: 2008.03.14 ]</span>
+    </footer>
+  </div>
 
-            const btn = document.getElementById('route-btn');
-            btn.textContent = '검색 중...';
+  <!-- Modals & Toasts -->
+  <div id="toast-container" class="toast-container"></div>
+  <div id="modal-overlay" class="modal-overlay hidden">
+    <div class="modal-box">
+      <div class="modal-header"><span id="modal-title">Alert</span><button id="modal-close" class="modal-close">✕</button></div>
+      <div class="modal-body" id="modal-body"></div>
+      <div class="modal-footer" id="modal-footer"></div>
+    </div>
+  </div>
 
-            try {
-                const fetchCoords = async (q) => {
-                    const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(q)}`, { headers: { 'User-Agent': 'DotoriMaps/1.0' } });
-                    const data = await res.json();
-                    return data.length > 0 ? [parseFloat(data[0].lat), parseFloat(data[0].lon)] : null;
-                };
-
-                const startCoords = await fetchCoords(startText);
-                const endCoords = await fetchCoords(endText);
-
-                if (startCoords && endCoords) {
-                    routingControl.setWaypoints([
-                        L.latLng(startCoords[0], startCoords[1]),
-                        L.latLng(endCoords[0], endCoords[1])
-                    ]);
-                } else {
-                    alert('위치를 찾을 수 없습니다. 더 구체적인 장소를 입력해보세요.');
-                }
-            } catch (err) {
-                alert('검색 중 오류가 발생했습니다.');
-            } finally {
-                btn.textContent = '길찾기 (Get Directions)';
-            }
-        });
-
-        // 6. Find Me
-        document.getElementById('locate-btn').addEventListener('click', () => {
-            if (!navigator.geolocation) { alert('이 브라우저는 위치 기능을 지원하지 않습니다.'); return; }
-            const btn = document.getElementById('locate-btn');
-            btn.textContent = '찾는 중...';
-
-            navigator.geolocation.getCurrentPosition(
-                (position) => {
-                    const lat = position.coords.latitude;
-                    const lng = position.coords.longitude;
-                    map.setView([lat, lng], 15);
-                    L.marker([lat, lng], { icon: acornIcon }).addTo(map).bindPopup('📍 내 위치').openPopup();
-                    btn.textContent = '📍 내 위치 찾기 (Find Me)';
-                },
-                (err) => {
-                    alert('위치를 가져올 수 없습니다.');
-                    btn.textContent = '📍 내 위치 찾기 (Find Me)';
-                }
-            );
-        });
-    </script>
+  <!-- Scripts (Order matters!) -->
+  <script src="js/config.js"></script>
+  <script src="js/storage/supabase.js"></script>
+  <script src="js/storage/index.js"></script>
+  <script src="js/app.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/taste.js"></script>
 </body>
 </html>
