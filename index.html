@@ -7,102 +7,74 @@
 
     <!-- Leaflet CSS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    
-    <!-- Leaflet Routing Machine CSS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
 
     <style>
-        /* Dotori Forest 2008 Aesthetic */
         :root {
-            --bg: #F5F5F5;
-            --panel: #FFFFFF;
-            --border: #CCCCCC;
-            --pink: #FF9EC4;
-            --pink-dark: #E87BA8;
-            --acorn-dark: #8B5E2E;
-            --cream: #FFF8F0;
-            --text: #333333;
+            --bg: #F5F5F5; --panel: #FFFFFF; --border: #CCCCCC;
+            --pink: #FF9EC4; --pink-dark: #E87BA8; --acorn-dark: #8B5E2E;
+            --cream: #FFF8F0; --text: #333333;
         }
-
         * { box-sizing: border-box; margin: 0; padding: 0; }
         html, body { height: 100%; font-family: 'Dotum', '돋움', sans-serif; background: var(--bg); overflow: hidden; }
-
-        /* Map fills the screen */
         #map { height: 100vh; width: 100%; z-index: 1; }
 
         /* Floating UI Panel */
         .dotori-panel {
-            position: absolute;
-            top: 16px;
-            left: 16px;
-            z-index: 1000;
-            width: 320px;
-            background: var(--panel);
-            border: 1px solid var(--border);
-            border-radius: 6px;
-            box-shadow: 0 4px 16px rgba(0,0,0,0.1);
-            padding: 16px;
-            display: flex;
-            flex-direction: column;
-            gap: 12px;
+            position: absolute; top: 16px; left: 16px; z-index: 1000;
+            width: 320px; background: var(--panel); border: 1px solid var(--border);
+            border-radius: 6px; box-shadow: 0 4px 16px rgba(0,0,0,0.1);
+            padding: 16px; display: flex; flex-direction: column; gap: 12px;
+            max-height: 90vh; overflow-y: auto;
         }
-
         .dotori-title {
-            font-weight: bold;
-            font-size: 20px;
-            color: var(--acorn-dark);
-            text-align: center;
-            border-bottom: 2px dashed var(--pink);
-            padding-bottom: 8px;
-            margin-bottom: 4px;
+            font-weight: bold; font-size: 20px; color: var(--acorn-dark);
+            text-align: center; border-bottom: 2px dashed var(--pink);
+            padding-bottom: 8px; margin-bottom: 4px;
         }
         .dotori-title span { color: #b8860b; }
-
         .input-group { display: flex; flex-direction: column; gap: 4px; }
         .input-group label { font-size: 11px; color: var(--acorn-dark); font-weight: bold; }
         
         .dotori-input {
-            width: 100%;
-            padding: 8px 10px;
-            border: 1px solid var(--border);
-            border-radius: 3px;
-            background: var(--cream);
-            font-size: 13px;
-            outline: none;
-            font-family: inherit;
+            width: 100%; padding: 8px 10px; border: 1px solid var(--border);
+            border-radius: 3px; background: var(--cream); font-size: 13px;
+            outline: none; font-family: inherit;
         }
         .dotori-input:focus { border-color: var(--pink); background: #FFFFFF; }
 
         .dotori-btn {
-            padding: 10px;
-            background: linear-gradient(to bottom, #FFB8D4, var(--pink));
-            border: 1px solid var(--pink-dark);
-            border-radius: 4px;
-            color: #FFFFFF;
-            font-size: 13px;
-            font-weight: bold;
-            cursor: pointer;
-            text-align: center;
-            transition: all 0.1s;
+            padding: 10px; background: linear-gradient(to bottom, #FFB8D4, var(--pink));
+            border: 1px solid var(--pink-dark); border-radius: 4px;
+            color: #FFFFFF; font-size: 13px; font-weight: bold;
+            cursor: pointer; text-align: center; transition: all 0.1s;
         }
         .dotori-btn:hover { background: linear-gradient(to bottom, var(--pink), var(--pink-dark)); }
         .dotori-btn:active { transform: translateY(1px); }
         .dotori-btn.secondary {
             background: linear-gradient(to bottom, #FFFFFF, #F0F0F0);
-            border-color: var(--border);
-            color: var(--text);
+            border-color: var(--border); color: var(--text);
         }
         .dotori-btn.secondary:hover { background: var(--cream); border-color: var(--pink); }
 
-        /* Hide routing instructions to keep the map clean */
+        /* Search Results List */
+        .search-results-list {
+            display: flex; flex-direction: column; gap: 4px;
+            background: #FFF; border: 1px solid var(--border);
+            border-radius: 4px; max-height: 150px; overflow-y: auto;
+        }
+        .search-result-item {
+            padding: 8px 10px; font-size: 11px; color: var(--text);
+            border-bottom: 1px solid #EEE; cursor: pointer;
+            transition: background 0.1s;
+        }
+        .search-result-item:last-child { border-bottom: none; }
+        .search-result-item:hover { background: var(--cream); color: var(--pink-dark); }
+
         .leaflet-routing-container { display: none !important; }
-        
-        /* Custom Acorn Marker */
         .acorn-marker div {
-            width: 18px; height: 18px;
-            background: #b8860b;
-            border: 3px solid #fff;
-            border-radius: 50%;
+            width: 18px; height: 18px; background: #b8860b;
+            border: 3px solid #fff; border-radius: 50%;
             box-shadow: 0 2px 6px rgba(0,0,0,0.35);
         }
     </style>
@@ -117,33 +89,30 @@
         <div class="input-group">
             <label>출발지 (Start)</label>
             <input type="text" id="start-input" class="dotori-input" placeholder="예: 서울역" />
+            <div id="start-results" class="search-results-list" style="display:none;"></div>
         </div>
         
         <div class="input-group">
             <label>도착지 (Destination)</label>
             <input type="text" id="end-input" class="dotori-input" placeholder="예: 강남역" />
+            <div id="end-results" class="search-results-list" style="display:none;"></div>
         </div>
 
         <button id="route-btn" class="dotori-btn">🚗 길찾기 (Get Directions)</button>
         <button id="locate-btn" class="dotori-btn secondary">📍 내 위치 찾기 (Find Me)</button>
     </div>
 
-    <!-- Leaflet JS -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <!-- Leaflet Routing Machine JS -->
     <script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.js"></script>
 
     <script>
-        // 1. Init Map (Centered on Seoul)
         const map = L.map('map').setView([37.5665, 126.9780], 13);
 
-        // 2. Add Tile Layer (OSM)
         L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
             maxZoom: 19,
             attribution: '&copy; OpenStreetMap contributors'
         }).addTo(map);
 
-        // 3. Custom Acorn Icon
         const acornIcon = L.divIcon({
             className: 'acorn-marker',
             html: `<div></div>`,
@@ -151,70 +120,96 @@
             iconAnchor: [9, 9]
         });
 
-        // 4. Setup Routing Control
         const routingControl = L.Routing.control({
-            waypoints: [], // Start empty
+            waypoints: [],
             router: L.Routing.osrmv1({ serviceUrl: 'https://router.project-osrm.org/route/v1' }),
-            lineOptions: {
-                styles: [{ color: '#FF9EC4', weight: 5, opacity: 0.8 }] // Pink route line!
-            },
-            createMarker: function(i, wp, nWps) {
-                return L.marker(wp.latLng, { icon: acornIcon });
-            }
+            lineOptions: { styles: [{ color: '#FF9EC4', weight: 5, opacity: 0.8 }] },
+            createMarker: function(i, wp, nWps) { return L.marker(wp.latLng, { icon: acornIcon }); }
         }).addTo(map);
 
-        // 5. Geocoding Function (Convert Address to Lat/Lng using Nominatim)
-        async function geocodeAddress(address) {
-            const url = `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(address)}`;
-            const res = await fetch(url);
-            const data = await res.json();
-            if (data && data.length > 0) {
-                return [parseFloat(data[0].lat), parseFloat(data[0].lon)];
+        // Search function that returns MULTIPLE results
+        async function searchLocations(query, resultContainerId) {
+            const container = document.getElementById(resultContainerId);
+            if (!query) { container.style.display = 'none'; return; }
+            
+            container.innerHTML = '<div class="search-result-item">검색 중...</div>';
+            container.style.display = 'flex';
+
+            try {
+                const url = `https://nominatim.openstreetmap.org/search?format=json&limit=5&q=${encodeURIComponent(query)}`;
+                const res = await fetch(url, { headers: { 'Accept': 'application/json' } });
+                const data = await res.json();
+
+                if (data && data.length > 0) {
+                    container.innerHTML = data.map(item => 
+                        `<div class="search-result-item" data-lat="${item.lat}" data-lon="${item.lon}">${item.display_name}</div>`
+                    ).join('');
+                    
+                    // Add click listeners to results
+                    container.querySelectorAll('.search-result-item').forEach(item => {
+                        item.addEventListener('click', () => {
+                            const lat = parseFloat(item.dataset.lat);
+                            const lon = parseFloat(item.dataset.lon);
+                            map.setView([lat, lon], 16);
+                            L.marker([lat, lon], { icon: acornIcon }).addTo(map).bindPopup(item.textContent).openPopup();
+                            
+                            // Put the text in the input
+                            const inputId = resultContainerId === 'start-results' ? 'start-input' : 'end-input';
+                            document.getElementById(inputId).value = item.textContent.split(',')[0];
+                            container.style.display = 'none';
+                        });
+                    });
+                } else {
+                    container.innerHTML = '<div class="search-result-item">결과 없음</div>';
+                }
+            } catch (err) {
+                container.innerHTML = '<div class="search-result-item">검색 오류</div>';
             }
-            return null;
         }
 
-        // 6. Handle "Get Directions" Button
+        // Attach search to inputs
+        document.getElementById('start-input').addEventListener('input', (e) => searchLocations(e.target.value, 'start-results'));
+        document.getElementById('end-input').addEventListener('input', (e) => searchLocations(e.target.value, 'end-results'));
+
+        // Get Directions
         document.getElementById('route-btn').addEventListener('click', async () => {
             const startText = document.getElementById('start-input').value.trim();
             const endText = document.getElementById('end-input').value.trim();
 
-            if (!startText || !endText) {
-                alert('출발지와 도착지를 모두 입력해주세요.');
-                return;
-            }
+            if (!startText || !endText) { alert('출발지와 도착지를 모두 입력해주세요.'); return; }
 
             const btn = document.getElementById('route-btn');
             btn.textContent = '검색 중...';
 
             try {
-                const startCoords = await geocodeAddress(startText);
-                const endCoords = await geocodeAddress(endText);
+                // Get coordinates for both
+                const resStart = await fetch(`https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(startText)}`);
+                const dataStart = await resStart.json();
+                
+                const resEnd = await fetch(`https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(endText)}`);
+                const dataEnd = await resEnd.json();
 
-                if (startCoords && endCoords) {
-                    // Update routing waypoints
+                if (dataStart.length > 0 && dataEnd.length > 0) {
+                    const startCoords = [parseFloat(dataStart[0].lat), parseFloat(dataStart[0].lon)];
+                    const endCoords = [parseFloat(dataEnd[0].lat), parseFloat(dataEnd[0].lon)];
+
                     routingControl.setWaypoints([
                         L.latLng(startCoords[0], startCoords[1]),
                         L.latLng(endCoords[0], endCoords[1])
                     ]);
                 } else {
-                    alert('위치를 찾을 수 없습니다. 다른 검색어를 입력해보세요.');
+                    alert('위치를 찾을 수 없습니다. 더 구체적인 장소를 입력해보세요.');
                 }
             } catch (err) {
-                console.error(err);
                 alert('검색 중 오류가 발생했습니다.');
             } finally {
                 btn.textContent = '🚗 길찾기 (Get Directions)';
             }
         });
 
-        // 7. Handle "Find Me" (Geolocation)
+        // Find Me
         document.getElementById('locate-btn').addEventListener('click', () => {
-            if (!navigator.geolocation) {
-                alert('이 브라우저는 위치 기능을 지원하지 않습니다.');
-                return;
-            }
-
+            if (!navigator.geolocation) { alert('이 브라우저는 위치 기능을 지원하지 않습니다.'); return; }
             const btn = document.getElementById('locate-btn');
             btn.textContent = '찾는 중...';
 
@@ -222,26 +217,17 @@
                 (position) => {
                     const lat = position.coords.latitude;
                     const lng = position.coords.longitude;
-                    
                     map.setView([lat, lng], 15);
-                    L.marker([lat, lng], { icon: acornIcon })
-                        .addTo(map)
-                        .bindPopup('📍 내 위치 (You are here)')
-                        .openPopup();
-
+                    L.marker([lat, lng], { icon: acornIcon }).addTo(map).bindPopup('📍 내 위치').openPopup();
                     document.getElementById('start-input').value = '내 위치';
-                    // We save the exact coords in a data attribute
-                    document.getElementById('start-input').dataset.coords = `${lat},${lng}`;
-                    
                     btn.textContent = '📍 내 위치 찾기 (Find Me)';
                 },
                 (err) => {
-                    alert('위치를 가져올 수 없습니다. 권한을 확인해주세요.');
+                    alert('위치를 가져올 수 없습니다.');
                     btn.textContent = '📍 내 위치 찾기 (Find Me)';
                 }
             );
         });
-
     </script>
 </body>
 </html>
