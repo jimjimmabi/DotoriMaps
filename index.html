@@ -6,39 +6,59 @@
   <title>DotoriMaps</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
-  <!-- Supabase -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   
   <style>
-    :root { --bg: #F5F5F5; --panel: #FFFFFF; --border: #CCCCCC; --pink: #FF9EC4; --pink-dark: #E87BA8; --acorn-dark: #8B5E2E; --cream: #FFF8F0; --text: #333333; }
+    :root { 
+      --bg: #F5F5F5; --panel: #FFFFFF; --border: #E5E5E5; --pink: #FF9EC4; --pink-dark: #E87BA8; 
+      --acorn-dark: #8B5E2E; --cream: #FFF8F0; --text: #333333; --kakao-blue: #3b82f6;
+    }
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    html, body { height: 100%; font-family: 'Dotum', sans-serif; background: var(--bg); overflow: hidden; display: flex; }
+    html, body { height: 100%; font-family: 'Dotum', 'Malgun Gothic', sans-serif; background: var(--bg); overflow: hidden; display: flex; }
     
     /* Sidebar */
-    .sidebar { width: 320px; height: 100vh; background: var(--panel); border-right: 1px solid var(--border); display: flex; flex-direction: column; z-index: 1000; box-shadow: 2px 0 10px rgba(0,0,0,0.05); }
-    .sidebar-header { background: var(--pink); color: #FFF; padding: 16px; font-size: 20px; font-weight: bold; text-align: center; }
-    .sidebar-tabs { display: flex; border-bottom: 1px solid var(--border); }
-    .sidebar-tab { flex: 1; padding: 10px 0; text-align: center; font-size: 12px; font-weight: bold; color: #888; cursor: pointer; border-bottom: 2px solid transparent; }
-    .sidebar-tab.active { color: var(--pink-dark); border-bottom-color: var(--pink-dark); }
+    .sidebar { width: 360px; height: 100vh; background: var(--panel); border-right: 1px solid var(--border); display: flex; flex-direction: column; z-index: 1000; box-shadow: 2px 0 10px rgba(0,0,0,0.05); }
+    .sidebar-header { background: var(--pink); color: #FFF; padding: 16px; font-size: 20px; font-weight: bold; text-align: center; border-bottom: 2px solid var(--pink-dark); }
+    .sidebar-tabs { display: flex; border-bottom: 1px solid var(--border); background: #FAFAFA; }
+    .sidebar-tab { flex: 1; padding: 12px 0; text-align: center; font-size: 13px; font-weight: bold; color: #888; cursor: pointer; border-bottom: 3px solid transparent; transition: 0.2s; }
+    .sidebar-tab.active { color: var(--kakao-blue); border-bottom-color: var(--kakao-blue); background: #FFF; }
     
-    .tab-content { flex: 1; overflow-y: auto; padding: 16px; display: none; flex-direction: column; gap: 12px; }
+    .tab-content { flex: 1; overflow-y: auto; padding: 16px; display: none; flex-direction: column; gap: 16px; }
     .tab-content.active { display: flex; }
     
-    .input-group { display: flex; flex-direction: column; gap: 4px; position: relative; }
-    .input-group label { font-size: 11px; color: var(--acorn-dark); font-weight: bold; }
-    .search-box { width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 6px; background: var(--cream); font-size: 13px; outline: none; }
-    .search-box:focus { border-color: var(--pink); background: #FFF; }
+    /* Kakao Style Tools */
+    .category-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; text-align: center; }
+    .cat-btn { background: var(--cream); border: 1px solid var(--border); border-radius: 8px; padding: 12px 0; cursor: pointer; transition: 0.2s; }
+    .cat-btn:hover { background: #FFEEDD; border-color: var(--pink); }
+    .cat-btn i { font-size: 20px; color: var(--acorn-dark); margin-bottom: 6px; display: block; }
+    .cat-btn span { font-size: 11px; font-weight: bold; color: var(--text); }
+
+    .recommendation-title { font-size: 14px; font-weight: bold; color: var(--text); margin-top: 10px; margin-bottom: -8px; }
     
-    .search-results-list { position: absolute; top: 100%; left: 0; right: 0; background: #FFF; border: 1px solid var(--border); border-radius: 6px; max-height: 200px; overflow-y: auto; z-index: 1010; display: none; flex-direction: column; margin-top: 4px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
-    .search-result-item { padding: 10px; font-size: 12px; border-bottom: 1px solid #EEE; cursor: pointer; }
+    /* Inputs */
+    .input-group { display: flex; flex-direction: column; gap: 6px; position: relative; }
+    .input-group label { font-size: 12px; color: var(--acorn-dark); font-weight: bold; }
+    .search-box { width: 100%; padding: 12px; border: 1px solid var(--border); border-radius: 8px; background: #FFF; font-size: 13px; outline: none; box-shadow: inset 0 1px 3px rgba(0,0,0,0.05); }
+    .search-box:focus { border-color: var(--pink); }
+    
+    /* Lists & Results */
+    .search-results-list { position: absolute; top: 100%; left: 0; right: 0; background: #FFF; border: 1px solid var(--border); border-radius: 8px; max-height: 200px; overflow-y: auto; z-index: 1010; display: none; flex-direction: column; margin-top: 4px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+    .search-result-item { padding: 12px; font-size: 12px; border-bottom: 1px solid #EEE; cursor: pointer; }
     .search-result-item:hover { background: var(--cream); color: var(--pink-dark); }
+
+    .place-card { background: #FFF; border: 1px solid var(--border); border-radius: 8px; padding: 12px; cursor: pointer; transition: 0.2s; }
+    .place-card:hover { border-color: var(--kakao-blue); box-shadow: 0 2px 8px rgba(59, 130, 246, 0.15); }
+    .place-card h4 { font-size: 13px; color: #333; margin-bottom: 4px; }
+    .place-card p { font-size: 11px; color: #888; }
+
+    .dotori-btn { padding: 14px; background: var(--kakao-blue); border: none; border-radius: 8px; color: #FFF; font-weight: bold; font-size: 14px; cursor: pointer; margin-top: auto;}
+    .dotori-btn:hover { background: #2563eb; }
     
-    .dotori-btn { padding: 12px; background: var(--pink); border: none; border-radius: 6px; color: #FFF; font-weight: bold; cursor: pointer; }
-    .dotori-btn:hover { background: var(--pink-dark); }
+    /* MAP FIX */
+    #map { flex: 1; height: 100vh; width: 100%; z-index: 1; background: #e5e3df; }
     
-    #map { flex: 1; height: 100vh; z-index: 1; }
-    
-    /* Floating Toolbox */
+    /* Toolbox */
     .map-toolbox { position: absolute; top: 16px; right: 16px; z-index: 1000; background: #FFF; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); display: flex; flex-direction: column; overflow: hidden; border: 1px solid var(--border); }
     .toolbox-btn { padding: 12px 14px; background: #FFF; border: none; border-bottom: 1px solid var(--border); cursor: pointer; font-size: 16px; color: var(--text); }
     .toolbox-btn:hover { background: var(--cream); }
@@ -53,12 +73,45 @@
   <div class="sidebar">
     <div class="sidebar-header">DotoriMaps</div>
     <div class="sidebar-tabs">
-      <div class="sidebar-tab active" onclick="switchTab('search')">Search</div>
-      <div class="sidebar-tab" onclick="switchTab('directions')">Directions</div>
+      <div class="sidebar-tab active" onclick="switchTab('home')"><i class="fa-solid fa-house"></i> Home</div>
+      <div class="sidebar-tab" onclick="switchTab('search')"><i class="fa-solid fa-magnifying-glass"></i> Search</div>
+      <div class="sidebar-tab" onclick="switchTab('directions')"><i class="fa-solid fa-diamond-turn-right"></i> Routes</div>
+    </div>
+
+    <!-- HOME TAB (NEW) -->
+    <div class="tab-content active" id="tab-home">
+      <div class="category-grid">
+        <div class="cat-btn" onclick="alert('Searching for Restaurants...')">
+          <i class="fa-solid fa-utensils"></i><span>Food</span>
+        </div>
+        <div class="cat-btn" onclick="alert('Searching for Cafes...')">
+          <i class="fa-solid fa-mug-hot"></i><span>Cafe</span>
+        </div>
+        <div class="cat-btn" onclick="alert('Searching for Transit...')">
+          <i class="fa-solid fa-train-subway"></i><span>Transit</span>
+        </div>
+        <div class="cat-btn" onclick="alert('Searching for Shopping...')">
+          <i class="fa-solid fa-bag-shopping"></i><span>Shopping</span>
+        </div>
+      </div>
+      
+      <div class="recommendation-title">🌰 Recommended for you</div>
+      <div class="place-card" onclick="map.setView([37.5665, 126.9780], 15);">
+        <h4>Seoul Station</h4>
+        <p>Train Station · 1.2km away</p>
+      </div>
+      <div class="place-card" onclick="map.setView([37.5796, 126.9770], 15);">
+        <h4>Gyeongbokgung Palace</h4>
+        <p>Tourist Attraction · 3.4km away</p>
+      </div>
+      <div class="place-card" onclick="map.setView([37.5512, 126.9882], 15);">
+        <h4>Namsan Seoul Tower</h4>
+        <p>Landmark · 2.8km away</p>
+      </div>
     </div>
 
     <!-- Search Tab -->
-    <div class="tab-content active" id="tab-search">
+    <div class="tab-content" id="tab-search">
       <div class="input-group">
         <label>Find a place</label>
         <input type="text" id="search-input" class="search-box" placeholder="e.g. Seoul Station" oninput="searchLocations(this.value, 'search-results')">
@@ -78,16 +131,15 @@
         <input type="text" id="end-input" class="search-box" placeholder="Destination" oninput="searchLocations(this.value, 'end-results')">
         <div id="end-results" class="search-results-list"></div>
       </div>
-      <button id="route-btn" class="dotori-btn" onclick="getDirections()">Get Directions</button>
+      <button id="route-btn" class="dotori-btn" onclick="getDirections()"><i class="fa-solid fa-route"></i> Get Directions</button>
     </div>
   </div>
 
-  <!-- Map -->
+  <!-- Map Container -->
   <div id="map"></div>
 
   <!-- Floating Toolbox -->
   <div class="map-toolbox">
-    <!-- NEW LOGIN BUTTON -->
     <button class="toolbox-btn" id="map-login-btn" title="Login" onclick="openMapLogin()">👤</button>
     <button class="toolbox-btn" id="zoom-in" title="Zoom In" onclick="map.zoomIn()">➕</button>
     <button class="toolbox-btn" id="zoom-out" title="Zoom Out" onclick="map.zoomOut()">➖</button>
@@ -97,6 +149,6 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.js"></script>
   <script src="js/storage/supabase.js"></script>
-  <script src="js/map.js"></script> <!-- We will create this -->
+  <script src="js/map.js"></script>
 </body>
 </html>

@@ -2,14 +2,12 @@
 // DotoriMaps - Map & Auth Logic
 // ============================================
 
-// 1. Init Map
+// 1. Init Map (Center on Seoul)
 const map = L.map('map').setView([37.5665, 126.9780], 13);
 L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '&copy; OpenStreetMap' }).addTo(map);
 
-// Custom Acorn Marker
 const acornIcon = L.divIcon({ className: 'acorn-marker', html: '<div></div>', iconSize: [18, 18], iconAnchor: [9, 9] });
 
-// 2. Routing Setup
 const routingControl = L.Routing.control({
   waypoints: [],
   router: L.Routing.osrmv1({ serviceUrl: 'https://router.project-osrm.org/route/v1' }),
@@ -17,15 +15,17 @@ const routingControl = L.Routing.control({
   createMarker: function(i, wp, nWps) { return L.marker(wp.latLng, { icon: acornIcon }); }
 }).addTo(map);
 
-// 3. Tab Switching
+// 2. Tab Switching Logic
 function switchTab(tabName) {
   document.querySelectorAll('.sidebar-tab').forEach(t => t.classList.remove('active'));
   document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
-  event.target.classList.add('active');
+  
+  // Find the clicked tab and activate it
+  event.currentTarget.classList.add('active');
   document.getElementById(`tab-${tabName}`).classList.add('active');
 }
 
-// 4. Search Logic (Debounced)
+// 3. Search Logic
 let searchTimeout;
 async function searchLocations(query, resultContainerId) {
   const container = document.getElementById(resultContainerId);
@@ -54,7 +54,7 @@ async function searchLocations(query, resultContainerId) {
     } catch (err) {
       container.innerHTML = '<div class="search-result-item">Error searching</div>';
     }
-  }, 600); // 600ms debounce to prevent rate limits
+  }, 600);
 }
 
 function selectLocation(lat, lon, name, containerId) {
@@ -66,7 +66,7 @@ function selectLocation(lat, lon, name, containerId) {
   document.getElementById(containerId).style.display = 'none';
 }
 
-// 5. Directions Logic
+// 4. Directions Logic
 async function getDirections() {
   const start = document.getElementById('start-input').value;
   const end = document.getElementById('end-input').value;
@@ -88,29 +88,20 @@ async function getDirections() {
   }
 }
 
-// ============================================
-// 6. MAP AUTHENTICATION LOGIC (Auto-Login)
-// ============================================
-
-// Auto-login when map loads
+// 5. Authentication Logic
 window.addEventListener('DOMContentLoaded', async () => {
   try {
-    // getMyAcorn is defined in supabase.js
     const profile = await DotoriStorage.getMyAcorn();
-    if (profile) {
-      updateMapLoginButton(profile);
-    }
-  } catch (e) {
-    console.log('No saved session found.');
-  }
+    if (profile) updateMapLoginButton(profile);
+  } catch (e) {}
 });
 
 function updateMapLoginButton(profile) {
   const btn = document.getElementById('map-login-btn');
   if (profile) {
-    btn.innerText = profile.mini_me || '🌰'; // Show their avatar
+    btn.innerText = profile.mini_me || '🌰';
     btn.title = `Logged in as ${profile.nickname}`;
-    btn.style.background = '#FFF8F0'; // Cream background for logged in
+    btn.style.background = '#FFF8F0'; 
   } else {
     btn.innerText = '👤';
     btn.title = 'Login';
@@ -119,7 +110,6 @@ function updateMapLoginButton(profile) {
 }
 
 function openMapLogin() {
-  // Check if already logged in
   const savedId = localStorage.getItem('dotori_my_id');
   if (savedId) {
     if (confirm(`Logged in as ${savedId}. Do you want to log out?`)) {
@@ -131,11 +121,9 @@ function openMapLogin() {
     return;
   }
 
-  // Prompt for ID
   const id = prompt("Enter your Dotori ID (e.g., dotori-xxxx):");
   if (!id) return;
 
-  // Login via Supabase
   DotoriStorage.loginByDotoriId(id).then(profile => {
     if (profile) {
       updateMapLoginButton(profile);
