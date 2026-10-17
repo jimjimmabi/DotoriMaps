@@ -31,8 +31,10 @@ let selectedPlaceData = null;
 let routingControl = null;
 let nearbyRequestId = 0;
 let nearbySort = 'distance';
-let nearbyLast = null;
-let userLocation = null;
+let nearbyLast = null;         // { items, label, mode: 'mixed' | 'category' }
+let userLocation = null;       // [lat, lng] once known
+let userLocationKnown = false;
+let lastSearchTerm = '';
 
 // ---------- Category metadata ----------
 const CATEGORY_META = {
@@ -184,10 +186,7 @@ function openModal(title, bodyHtml, buttons) {
     const btn = document.createElement('button');
     btn.className = b.primary ? 'dotori-btn' : 'small-btn';
     btn.textContent = b.label;
-    btn.style.width = b.primary ? 'auto' : 'auto';
-    btn.addEventListener('click', () => {
-      if (b.onClick) b.onClick();
-    });
+    btn.addEventListener('click', () => { if (b.onClick) b.onClick(); });
     footer.appendChild(btn);
   });
   document.getElementById('modal').classList.add('open');
@@ -218,30 +217,182 @@ function switchTab(event, tabName) {
   closeDetailPanel();
 }
 
-// ---------- Find my location ----------
-function findMyLocation() {
-  if (!navigator.geolocation) { showToast('Geolocation not supported'); return; }
-  const btn = document.getElementById('locate-btn');
-  if (btn) btn.textContent = '⏳';
+// ============================================
+// AUTO-LOCATION ON LOAD
+// ============================================
+function autoLocateOnLoad() {
+  const status = document.getElementById('nearby-status');
+  if (status) status.textContent = '📍 Asking for your location…';
+
+  if (!navigator.geolocation) {
+    const fallback = [37.5665, 126.9780];
+    userLocation = fallback;
+    userLocationKnown = true;
+    map.setView(fallback, 14);
+    if (status) status.textContent = '📍 Showing places around Seoul (no location support).';
+    loadMixedNearby(true);
+    return;
+  }
 
   navigator.geolocation.getCurrentPosition(
     (pos) => {
       const { latitude: lat, longitude: lng } = pos.coords;
       userLocation = [lat, lng];
-      map.flyTo([lat, lng], 16, { duration: 1.5 });
+      userLocationKnown = true;
+
+      map.flyTo([lat, lng], 15, { duration: 1.2 });
+
       if (currentMarker) map.removeLayer(currentMarker);
       currentMarker = L.marker([lat, lng], { icon: userIcon })
         .addTo(map)
-        .bindPopup('📍 You are here')
-        .openPopup();
-      if (btn) btn.textContent = '📍';
+        .bindPopup('📍 You are here');
+
+      if (status) status.textContent = '📍 Showing places near you.';
+      loadMixedNearby(true);
     },
-    () => { showToast('Could not get location.'); if (btn) btn.textContent = '📍'; },
-    { enableHighAccuracy: true, timeout: 10000 }
+    (err) => {
+      const fallback = [37.5665, 126.9780];
+      userLocation = fallback;
+      userLocationKnown = true;
+      map.setView(fallback, 13);
+
+      let reason = 'Location unavailable';
+      if (err && err.code === 1) reason = 'Location denied';
+      else if (err && err.code === 2) reason = 'Location unavailable';
+      else if (err && err.code === 3) reason = 'Location timed out';
+
+      if (status) status.textContent = `📍 ${reason}. Showing places around Seoul.`;
+      loadMixedNearby(true);
+    },
+    { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
   );
 }
 
-// ---------- Nearby ----------
+// ============================================
+// MIXED NEARBY (default automatic feed)
+// ============================================
+async function loadMixedNearby(force) {
+  const listContainer = document.getElementById('nearby-list');
+  const statusEl = document.getElementById('nearby-status');
+  const titleText = document.getElementById('nearby-title-text');
+  const resetBtn = document.getElementById('reset-nearby-btn');
+  const sortChips = document.getElementById('nearby-sort-chips');
+  if (!listContainer) return;
+
+  const requestId = ++nearbyRequestId;
+  listContainer.innerHTML = '<div class="spinner"></div>';
+  if (statusEl) statusEl.textContent = 'Loading nearby places…';
+  if (titleText) titleText.textContent = '🌰 Nearby';
+  if (resetBtn) resetBtn.style.display = 'none';
+  if (sortChips) sortChips.style.display = 'flex';
+
+  const center = userLocation
+    ? L.latLng(userLocation[0], userLocation[1])
+    : map.getCenter();
+  const lat = center.lat;
+  const lng = center.lng;
+  const radius = 1500;
+
+  const query = `[out:json][timeout:20];(
+    node[amenity=cafe](around:${radius},${lat},${lng});
+    node[amenity=restaurant](around:${radius},${lat},${lng});
+    node[amenity=fast_food](around:${radius},${lat},${lng});
+    node[shop=supermarket](around:${radius},${lat},${lng});
+    node[shop=convenience](around:${radius},${lat},${lng});
+    node[leisure=park](around:${radius},${lat},${lng});
+    node[amenity=pharmacy](around:${radius},${lat},${lng});
+    node[amenity=bank](around:${radius},${lat},${lng});
+    node[amenity=atm](around:${radius},${lat},${lng});
+    node[public_transport=station](around:${radius},${lat},${lng});
+  );out body 80;`;
+
+  const endpoints = [
+    'https://overpass-api.de/api/interpreter',
+    'https://overpass.kumi.systems/api/interpreter'
+  ];
+
+  let data = null;
+  for (const url of endpoints) {
+    try {
+      const res = await fetch(url, { method: 'POST', body: query });
+      if (!res.ok) continue;
+      data = await res.json();
+      if (data && data.elements) break;
+    } catch (e) { console.warn(`Overpass failed: ${url}`); }
+  }
+
+  if (requestId !== nearbyRequestId) return;
+
+  const seen = new Set();
+  const places = (data && data.elements ? data.elements : [])
+    .filter((p) => {
+      if (seen.has(p.id)) return false;
+      seen.add(p.id);
+      return true;
+    })
+    .map((p) => {
+      p.distance = map.distance([lat, lng], [p.lat, p.lon]);
+      return p;
+    });
+
+  nearbyLast = { items: places, label: 'Nearby', mode: 'mixed' };
+  if (statusEl) statusEl.textContent = places.length > 0
+    ? `${places.length} places within 1.5 km — tap a category above to narrow.`
+    : 'No places found nearby. Try moving the map or tapping a category.';
+
+  renderMixedNearbyList();
+}
+
+function renderMixedNearbyList() {
+  const listContainer = document.getElementById('nearby-list');
+  if (!listContainer || !nearbyLast) return;
+
+  const { items } = nearbyLast;
+
+  if (!items || items.length === 0) {
+    listContainer.innerHTML = `
+      <div class="empty-state">
+        <span class="em">Nothing found nearby</span>
+        Move the map or pick a category above.
+      </div>`;
+    return;
+  }
+
+  const sorted = [...items].sort((a, b) => {
+    if (nearbySort === 'name') {
+      const an = (a.tags && a.tags.name) || '';
+      const bn = (b.tags && b.tags.name) || '';
+      return an.localeCompare(bn);
+    }
+    return a.distance - b.distance;
+  });
+
+  listContainer.innerHTML = '';
+  sorted.forEach((place) => {
+    const name = (place.tags && place.tags.name) || (place.tags && place.tags.operator) || 'Unnamed Place';
+    const distance = place.distance > 1000
+      ? (place.distance / 1000).toFixed(1) + ' km'
+      : place.distance.toFixed(0) + ' m';
+    const meta = metaFor(place);
+
+    const card = document.createElement('div');
+    card.className = 'place-card';
+    card.innerHTML = `
+      <div class="place-card-icon">${meta.icon}</div>
+      <div class="place-card-body">
+        <h4></h4>
+        <p></p>
+      </div>`;
+    card.querySelector('h4').textContent = name;
+    card.querySelector('p').textContent = `${meta.label} · ${distance}`;
+    card.addEventListener('click', () => showDetailForOSM(place, name, meta.label, distance));
+    listContainer.appendChild(card);
+  });
+}
+
+// ============================================
+// CATEGORY-FILTERED NEARBY
+// ============================================
 const NEARBY_QUERIES = {
   restaurant:  { q: 'amenity=restaurant', label: 'Restaurants' },
   cafe:        { q: 'amenity=cafe', label: 'Cafés' },
@@ -253,7 +404,9 @@ const NEARBY_QUERIES = {
 
 async function findNearby(category) {
   const listContainer = document.getElementById('nearby-list');
-  const title = document.getElementById('nearby-title');
+  const statusEl = document.getElementById('nearby-status');
+  const titleText = document.getElementById('nearby-title-text');
+  const resetBtn = document.getElementById('reset-nearby-btn');
   if (!listContainer) return;
 
   const meta = NEARBY_QUERIES[category];
@@ -261,9 +414,13 @@ async function findNearby(category) {
 
   const requestId = ++nearbyRequestId;
   listContainer.innerHTML = '<div class="spinner"></div>';
-  title.textContent = `🌰 Nearby ${meta.label}`;
+  if (titleText) titleText.textContent = `🌰 Nearby ${meta.label}`;
+  if (statusEl) statusEl.textContent = '';
+  if (resetBtn) resetBtn.style.display = '';
 
-  const center = userLocation ? L.latLng(userLocation[0], userLocation[1]) : map.getCenter();
+  const center = userLocation
+    ? L.latLng(userLocation[0], userLocation[1])
+    : map.getCenter();
   const lat = center.lat;
   const lng = center.lng;
   const radius = 2000;
@@ -285,35 +442,14 @@ async function findNearby(category) {
     } catch (e) { console.warn(`Overpass failed: ${url}`); }
   }
 
-  if (requestId !== nearbyRequestId) return; // superseded
+  if (requestId !== nearbyRequestId) return;
 
   const places = (data && data.elements ? data.elements : []).map((p) => {
     p.distance = map.distance([lat, lng], [p.lat, p.lon]);
     return p;
   });
-  nearbyLast = { items: places, label: meta.label };
 
-  // Inject sort chips once
-  const sortContainer = title.querySelector('.sort-chips');
-  if (!sortContainer) {
-    const chips = document.createElement('span');
-    chips.className = 'sort-chips';
-    chips.innerHTML = `
-      <button class="sort-chip active" data-sort="distance">Distance</button>
-      <button class="sort-chip" data-sort="name">Name</button>
-    `;
-    title.appendChild(chips);
-    chips.querySelectorAll('.sort-chip').forEach((c) => {
-      c.addEventListener('click', (e) => {
-        e.stopPropagation();
-        nearbySort = c.dataset.sort;
-        chips.querySelectorAll('.sort-chip').forEach((x) => x.classList.remove('active'));
-        c.classList.add('active');
-        renderNearbyList();
-      });
-    });
-  }
-
+  nearbyLast = { items: places, label: meta.label, mode: 'category' };
   renderNearbyList();
 }
 
@@ -327,7 +463,7 @@ function renderNearbyList() {
     listContainer.innerHTML = `
       <div class="empty-state">
         <span class="em">No ${label} found nearby</span>
-        Try moving the map, or pick another category.
+        Move the map, or tap "Back to mixed nearby".
       </div>`;
     return;
   }
@@ -364,7 +500,9 @@ function renderNearbyList() {
   });
 }
 
-// ---------- Detail panel ----------
+// ============================================
+// DETAIL PANEL
+// ============================================
 function showDetailForOSM(place, name, category, distance) {
   selectedPlaceData = {
     id: place.id || null,
@@ -388,9 +526,7 @@ function showDetailForOSM(place, name, category, distance) {
 
 function showDetailForCoords(lat, lon, name, category) {
   selectedPlaceData = {
-    id: null,
-    lat, lon,
-    name,
+    id: null, lat, lon, name,
     category: category || 'Location',
     distance: null,
     tags: {}
@@ -409,20 +545,17 @@ function renderDetailPanel() {
   document.getElementById('detail-name').textContent = displayName;
   document.getElementById('detail-category').textContent = category;
 
-  // Hero photo — try Wikimedia first
   const photoEl = document.getElementById('detail-photo');
   photoEl.innerHTML = `<span>${meta.icon}</span>`;
   const photoUrl = buildPhotoUrl(t);
   if (photoUrl) {
     const img = new Image();
     img.onload = () => { photoEl.innerHTML = ''; photoEl.appendChild(img); };
-    img.onerror = () => { /* keep emoji fallback */ };
     img.alt = displayName;
     img.style.cssText = 'width:100%;height:100%;object-fit:cover;';
     img.src = photoUrl;
   }
 
-  // Subtitle
   const distance = p.distance
     ? (p.distance > 1000 ? (p.distance / 1000).toFixed(1) + ' km' : p.distance.toFixed(0) + ' m')
     : '';
@@ -431,7 +564,6 @@ function renderDetailPanel() {
     [distance ? distance + ' away' : '', address].filter(Boolean).join(' · ') ||
     'No further info available';
 
-  // Facts
   const facts = document.getElementById('detail-facts');
   facts.innerHTML = '';
 
@@ -468,16 +600,13 @@ function renderDetailPanel() {
   if (t.wikipedia) addFact('📖', 'Wikipedia article', 'https://en.wikipedia.org/wiki/' + encodeURIComponent(t.wikipedia));
   addFact('🧭', `${p.lat.toFixed(5)}, ${p.lon.toFixed(5)}`);
 
-  // Save button state
   refreshSaveButton();
 
-  // Nearby chips
   const nearbyEl = document.getElementById('detail-nearby');
   const nearbyGrid = document.getElementById('detail-nearby-grid');
   nearbyGrid.innerHTML = '';
   nearbyEl.style.display = 'none';
 
-  // Load nearby categories asynchronously
   fetchNearbySummary(p.lat, p.lon).then((counts) => {
     const entries = Object.entries(counts).filter(([, c]) => c > 0);
     if (entries.length === 0) return;
@@ -503,7 +632,7 @@ function renderDetailPanel() {
 }
 
 function mapToMainCategory(cat) {
-  const map = {
+  const m = {
     restaurant: 'restaurant', fast_food: 'restaurant',
     cafe: 'cafe', bakery: 'cafe',
     supermarket: 'supermarket', convenience: 'supermarket',
@@ -512,7 +641,7 @@ function mapToMainCategory(cat) {
     station: 'transit', subway: 'transit', bus_stop: 'transit',
     public_transport: 'transit'
   };
-  return map[cat] || null;
+  return m[cat] || null;
 }
 
 function formatAddress(t) {
@@ -566,7 +695,9 @@ function closeDetailPanel() {
   if (el) el.classList.remove('open');
 }
 
-// ---------- Search ----------
+// ============================================
+// SEARCH
+// ============================================
 const searchTimeouts = {};
 
 async function searchLocations(query, containerId) {
@@ -615,6 +746,64 @@ async function searchLocations(query, containerId) {
             parseFloat(item.lon),
             item.display_name,
             containerId
+          );
+        });
+        container.appendChild(row);
+      });
+    } catch (err) {
+      container.innerHTML = '<div class="search-result-item">Search failed</div>';
+    }
+  }, 400);
+}
+
+// Search specifically near the user (in the home tab)
+async function searchNearMe(query) {
+  const container = document.getElementById('home-search-results');
+  if (!container) return;
+
+  if (!query || query.trim().length < 2) {
+    container.style.display = 'none';
+    return;
+  }
+
+  container.innerHTML = '<div class="search-result-item">Searching…</div>';
+  container.style.display = 'flex';
+
+  clearTimeout(searchTimeouts['home-search-results']);
+  searchTimeouts['home-search-results'] = setTimeout(async () => {
+    try {
+      const bias = userLocation ? `&viewbox=${userLocation[1] - 0.1},${userLocation[0] + 0.1},${userLocation[1] + 0.1},${userLocation[0] - 0.1}&bounded=0` : '';
+      const res = await fetch(
+        `https://nominatim.openstreetmap.org/search?format=json&limit=6&addressdetails=1&q=${encodeURIComponent(query)}${bias}`,
+        { headers: { 'Accept': 'application/json', 'User-Agent': 'DotoriMaps/1.0' } }
+      );
+      const data = await res.json();
+
+      if (!data || data.length === 0) {
+        container.innerHTML = '<div class="search-result-item">No results found</div>';
+        return;
+      }
+
+      container.innerHTML = '';
+      data.forEach((item) => {
+        const row = document.createElement('div');
+        row.className = 'search-result-item';
+        const primary = (item.display_name || '').split(',')[0];
+        const rest = (item.display_name || '').split(',').slice(1).join(', ').trim();
+        const strong = document.createElement('div');
+        strong.textContent = primary;
+        row.appendChild(strong);
+        if (rest) {
+          const small = document.createElement('small');
+          small.textContent = rest;
+          row.appendChild(small);
+        }
+        row.addEventListener('click', () => {
+          selectSearchResult(
+            parseFloat(item.lat),
+            parseFloat(item.lon),
+            item.display_name,
+            'home-search-results'
           );
         });
         container.appendChild(row);
@@ -715,7 +904,9 @@ async function reverseGeocodeAndShow(lat, lon, fallbackName) {
   } catch (e) { /* keep optimistic render */ }
 }
 
-// ---------- Routing ----------
+// ============================================
+// ROUTING
+// ============================================
 async function getDirections() {
   const startInput = document.getElementById('start-input');
   const endInput = document.getElementById('end-input');
@@ -790,7 +981,6 @@ function routeToSelected() {
   const endInput = document.getElementById('end-input');
   if (endInput) endInput.value = selectedPlaceData.name;
   closeDetailPanel();
-  // Try to start from user location if we have it
   if (userLocation) {
     const startInput = document.getElementById('start-input');
     if (startInput && !startInput.value) {
@@ -799,7 +989,9 @@ function routeToSelected() {
   }
 }
 
-// ---------- Saved places drawer ----------
+// ============================================
+// SAVED PLACES DRAWER
+// ============================================
 function openSavedDrawer() {
   const list = getSaved();
   const body = document.createElement('div');
@@ -817,8 +1009,7 @@ function openSavedDrawer() {
           <p></p>
         </div>`;
       card.querySelector('h4').textContent = place.name || 'Saved place';
-      card.querySelector('p').textContent =
-        `${place.lat.toFixed(4)}, ${place.lon.toFixed(4)}`;
+      card.querySelector('p').textContent = `${place.lat.toFixed(4)}, ${place.lon.toFixed(4)}`;
       card.addEventListener('click', () => {
         closeModal();
         if (currentMarker) map.removeLayer(currentMarker);
@@ -838,7 +1029,9 @@ function openSavedDrawer() {
   document.getElementById('modal-body').appendChild(body);
 }
 
-// ---------- Share ----------
+// ============================================
+// SHARE
+// ============================================
 async function shareCurrent() {
   if (!selectedPlaceData) return;
   const url = `https://www.openstreetmap.org/?mlat=${selectedPlaceData.lat}&mlon=${selectedPlaceData.lon}#map=17/${selectedPlaceData.lat}/${selectedPlaceData.lon}`;
@@ -857,7 +1050,9 @@ async function shareCurrent() {
   }
 }
 
-// ---------- Login / auth ----------
+// ============================================
+// LOGIN / AUTH
+// ============================================
 async function initAuthUI() {
   try {
     const profile = await DotoriStorage.getMyAcorn();
@@ -932,7 +1127,38 @@ async function openMapLogin() {
   }, 60);
 }
 
-// ---------- Keyboard shortcuts ----------
+// ============================================
+// FIND MY LOCATION (manual button)
+// ============================================
+function findMyLocation() {
+  if (!navigator.geolocation) { showToast('Geolocation not supported'); return; }
+  const btn = document.getElementById('locate-btn');
+  if (btn) btn.textContent = '⏳';
+
+  navigator.geolocation.getCurrentPosition(
+    (pos) => {
+      const { latitude: lat, longitude: lng } = pos.coords;
+      userLocation = [lat, lng];
+      userLocationKnown = true;
+      map.flyTo([lat, lng], 16, { duration: 1.5 });
+      if (currentMarker) map.removeLayer(currentMarker);
+      currentMarker = L.marker([lat, lng], { icon: userIcon })
+        .addTo(map)
+        .bindPopup('📍 You are here')
+        .openPopup();
+      if (btn) btn.textContent = '📍';
+
+      // Reload mixed nearby from the new position
+      loadMixedNearby(true);
+    },
+    () => { showToast('Could not get location.'); if (btn) btn.textContent = '📍'; },
+    { enableHighAccuracy: true, timeout: 10000 }
+  );
+}
+
+// ============================================
+// KEYBOARD
+// ============================================
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') {
     closeDetailPanel();
@@ -950,17 +1176,45 @@ document.addEventListener('keydown', (e) => {
   }
 });
 
-// ---------- Toolbox wiring ----------
+// ============================================
+// SORT CHIPS
+// ============================================
+document.addEventListener('DOMContentLoaded', () => {
+  const chips = document.getElementById('nearby-sort-chips');
+  if (!chips) return;
+  chips.querySelectorAll('.sort-chip').forEach((c) => {
+    c.addEventListener('click', (e) => {
+      e.stopPropagation();
+      nearbySort = c.dataset.sort;
+      chips.querySelectorAll('.sort-chip').forEach((x) => x.classList.remove('active'));
+      c.classList.add('active');
+      if (nearbyLast && nearbyLast.mode === 'mixed') renderMixedNearbyList();
+      else renderNearbyList();
+    });
+  });
+});
+
+// ============================================
+// TOOLBOX WIRING
+// ============================================
 document.getElementById('map-login-btn')?.addEventListener('click', openMapLogin);
 document.getElementById('locate-btn')?.addEventListener('click', findMyLocation);
 document.getElementById('saved-btn')?.addEventListener('click', openSavedDrawer);
 document.getElementById('zoom-in')?.addEventListener('click', () => map.zoomIn());
 document.getElementById('zoom-out')?.addEventListener('click', () => map.zoomOut());
 
-// ---------- Init ----------
+// ============================================
+// INIT
+// ============================================
 renderRecent();
+
+// Fire auto-location as soon as the DOM is ready
 if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', initAuthUI);
+  document.addEventListener('DOMContentLoaded', () => {
+    autoLocateOnLoad();
+    initAuthUI();
+  });
 } else {
+  autoLocateOnLoad();
   initAuthUI();
 }

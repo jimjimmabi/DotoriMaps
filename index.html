@@ -70,16 +70,16 @@
       font-size: 13px; font-weight: bold; color: var(--acorn-dark);
       display: flex; justify-content: space-between; align-items: center; gap: 8px;
     }
-    .section-title .sort-chips { display: flex; gap: 4px; }
+    .sort-chips { display: flex; gap: 4px; }
     .sort-chip {
       font-size: 10px; padding: 3px 8px; border-radius: 10px;
       border: 1px solid var(--border); background: #FFF; cursor: pointer;
-      color: var(--text-light); transition: all .15s;
+      color: var(--text-light); transition: all .15s; font-family: inherit;
     }
     .sort-chip.active { background: var(--pink); border-color: var(--pink-dark); color: #FFF; font-weight: bold; }
     .sort-chip:hover:not(.active) { border-color: var(--pink); }
 
-    /* ---------- SPINNER / EMPTY / ERROR ---------- */
+    /* ---------- SPINNER / EMPTY ---------- */
     .spinner {
       border: 3px solid #F0F0F0; border-top-color: var(--pink);
       border-radius: 50%; width: 24px; height: 24px;
@@ -171,7 +171,7 @@
       padding: 8px 14px; font-size: 12px; border-radius: 8px;
       background: #FFF; border: 1px solid var(--border); color: var(--text);
       cursor: pointer; font-family: inherit; transition: all .15s;
-      display: inline-flex; align-items: center; gap: 5px;
+      display: inline-flex; align-items: center; justify-content: center; gap: 5px;
     }
     .small-btn:hover { border-color: var(--pink); background: var(--cream); }
     .small-btn.saved { background: var(--pink); border-color: var(--pink-dark); color: #FFF; font-weight: bold; }
@@ -267,7 +267,7 @@
     .detail-nearby-chip:hover { background: #FFE8F0; border-color: var(--pink); }
     .detail-nearby-chip .muted { color: #AAA; font-size: 10px; }
 
-    /* ---------- MODAL (login, directions confirmation, etc.) ---------- */
+    /* ---------- MODAL ---------- */
     .modal-backdrop {
       position: fixed; inset: 0; background: rgba(0,0,0,.4);
       display: none; align-items: center; justify-content: center;
@@ -353,8 +353,18 @@
 
     <!-- ---------- HOME / EXPLORE ---------- -->
     <div class="tab-content active" id="tab-home">
+      <div class="input-group">
+        <label>Search near me</label>
+        <input type="text" id="home-search-input" class="search-box"
+               placeholder="Search places near your location"
+               autocomplete="off"
+               oninput="searchNearMe(this.value)"
+               onkeydown="searchKeyNav(event, 'home-search-results')">
+        <div id="home-search-results" class="search-results-list"></div>
+      </div>
+
       <div>
-        <div class="section-title" style="margin-bottom:8px;">🌰 What's nearby?</div>
+        <div class="section-title" style="margin-bottom:8px;">🌰 Filter nearby</div>
         <div class="category-grid">
           <div class="cat-btn" onclick="findNearby('restaurant')">
             <i class="fa-solid fa-utensils"></i><span>Food</span>
@@ -375,13 +385,27 @@
             <i class="fa-solid fa-prescription-bottle-medical"></i><span>Pharmacy</span>
           </div>
         </div>
+        <button class="small-btn" id="reset-nearby-btn"
+                style="margin-top:8px; width:100%; display:none;"
+                onclick="loadMixedNearby(true)">
+          <i class="fa-solid fa-arrow-rotate-left"></i> Back to mixed nearby
+        </button>
       </div>
 
-      <div class="section-title" id="nearby-title">📍 Pick a category above</div>
+      <div class="section-title">
+        <span id="nearby-title-text">🌰 Nearby</span>
+        <span class="sort-chips" id="nearby-sort-chips" style="display:none;">
+          <button class="sort-chip active" data-sort="distance">Distance</button>
+          <button class="sort-chip" data-sort="name">Name</button>
+        </span>
+      </div>
+
+      <div id="nearby-status" class="empty-state" style="padding: 0 0 6px 0;"></div>
+
       <div id="nearby-list">
         <div class="empty-state">
-          <span class="em">Discover nearby</span>
-          Tap a category to see what's around the map center.
+          <div class="spinner"></div>
+          <div style="margin-top:8px;">Finding places near you…</div>
         </div>
       </div>
     </div>

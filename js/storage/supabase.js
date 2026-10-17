@@ -1,5 +1,5 @@
 // ============================================
-// Dotorimaps — Supabase Adapter
+// Dotorimaps — Supabase Adapter (final)
 // ============================================
 
 const SUPABASE_URL_FALLBACK = 'https://xdqmsrferkstomzytkoh.supabase.co';
@@ -15,10 +15,7 @@ if (window.supabase && window.supabase.createClient) {
   console.warn('🌰 Supabase SDK not loaded — DotoriMaps will run without auth.');
 }
 
-// If the SDK failed to load, replace every function with a safe no-op fallback.
 const OFFLINE = !sb;
-
-// ---------- Helpers ----------
 
 function getSavedDotoriId() {
   try { return localStorage.getItem('dotori_my_id'); } catch (e) { return null; }
@@ -27,10 +24,7 @@ function getSavedDotoriId() {
 function saveSession(profile) {
   localStorage.setItem('dotori_my_id', profile.dotori_id);
   localStorage.setItem('dotori_session', JSON.stringify({
-    loggedIn: true,
-    dotori_id: profile.dotori_id,
-    user_id: profile.id,
-    is_owner: true
+    loggedIn: true, dotori_id: profile.dotori_id, user_id: profile.id, is_owner: true
   }));
 }
 
@@ -40,6 +34,7 @@ function clearSession() {
 }
 
 async function ensureAnonSession() {
+  if (OFFLINE) return null;
   const { data: { session } } = await sb.auth.getSession();
   if (session) return session;
   const { error } = await sb.auth.signInAnonymously();
@@ -48,77 +43,60 @@ async function ensureAnonSession() {
 }
 
 // ---------- Auth ----------
-
 async function getMyAcorn() {
+  if (OFFLINE) return null;
   const myId = getSavedDotoriId();
   if (!myId) return null;
-
-  // Make sure we still have an anon session to read with
   try { await ensureAnonSession(); } catch (e) {}
 
-  const { data, error } = await sb
-    .from('profiles')
-    .select('*')
-    .eq('dotori_id', myId)
-    .maybeSingle();
+  const { data, error } = await sb.from('profiles')
+    .select('*').eq('dotori_id', myId).maybeSingle();
 
   if (error) {
-    // PGRST116 = no rows → the acorn really doesn't exist, clear the local hint.
-    // Any other error (network, RLS, 5xx) is transient — don't nuke the session.
     if (error.code === 'PGRST116') clearSession();
     return null;
   }
-  if (!data) {
-    clearSession();
-    return null;
-  }
+  if (!data) { clearSession(); return null; }
   return data;
 }
 
 async function loginByDotoriId(dotoriId, options) {
+  if (OFFLINE) return null;
   const opts = options || {};
   const asVisitor = !!opts.asVisitor;
 
   const cleaned = String(dotoriId).trim().toLowerCase();
-  const { data: profile, error } = await sb
-    .from('profiles')
-    .select('*')
-    .eq('dotori_id', cleaned)
-    .maybeSingle();
+  const { data: profile, error } = await sb.from('profiles')
+    .select('*').eq('dotori_id', cleaned).maybeSingle();
 
   if (error || !profile) return null;
 
-  // Ensure we have an active Supabase session so RLS allows us to read/write
   try { await ensureAnonSession(); } catch (e) { throw e; }
 
-  if (!asVisitor) {
-    saveSession(profile);
-  }
-
+  if (!asVisitor) saveSession(profile);
   return profile;
 }
 
 async function logout() {
-  try { await sb.auth.signOut(); } catch (e) { /* ignore */ }
+  if (!OFFLINE) {
+    try { await sb.auth.signOut(); } catch (e) {}
+  }
   clearSession();
 }
 
-// ---------- Read-only profile helpers (used by taste.js etc.) ----------
-
+// ---------- Read-only helpers ----------
 async function getProfileByDotoriId(dotoriId) {
+  if (OFFLINE) return null;
   const cleaned = String(dotoriId).trim().toLowerCase();
-  const { data, error } = await sb
-    .from('profiles')
-    .select('*')
-    .eq('dotori_id', cleaned)
-    .maybeSingle();
+  const { data, error } = await sb.from('profiles')
+    .select('*').eq('dotori_id', cleaned).maybeSingle();
   if (error) return null;
   return data;
 }
 
 async function getAllProfiles() {
-  const { data, error } = await sb
-    .from('profiles')
+  if (OFFLINE) return [];
+  const { data, error } = await sb.from('profiles')
     .select('dotori_id, nickname, status_message, mini_me, mini_me_bg, mini_me_image_url, tastes, birthday, created_at')
     .order('created_at', { ascending: false })
     .limit(100);
@@ -127,10 +105,8 @@ async function getAllProfiles() {
 }
 
 // ---------- Match score ----------
-
 function calculateMatch(myTastes, theirTastes, myBirthday, theirBirthday) {
   if (!myTastes || !theirTastes) return { score: 0, reasons: [] };
-
   let score = 0;
   const reasons = [];
 
@@ -162,45 +138,32 @@ function calculateMatch(myTastes, theirTastes, myBirthday, theirBirthday) {
       score += 8; reasons.push('같은 달 생일 🎂');
     }
   }
-
   return { score: Math.min(score, 100), reasons };
 }
 
-// ---------- Notes (send only) ----------
-
+// ---------- Notes ----------
 async function sendNote(recipientDotoriId, message) {
+  if (OFFLINE) throw new Error('오프라인 상태예요');
   const me = await getMyAcorn();
   if (!me) throw new Error('내 정보를 찾을 수 없어요');
-
   const recipient = await getProfileByDotoriId(recipientDotoriId);
   if (!recipient) throw new Error('그런 도토리를 찾을 수 없어요');
   if (recipient.id === me.id) throw new Error('자신에게는 쪽지를 보낼 수 없어요');
 
-  const { data, error } = await sb
-    .from('notes')
+  const { data, error } = await sb.from('notes')
     .insert([{ sender_id: me.id, recipient_id: recipient.id, message }])
-    .select()
-    .single();
-
+    .select().single();
   if (error) throw error;
   return data;
 }
 
 // ---------- Expose ----------
-
 window.DotoriStorage = {
-  // Auth
   getMyAcorn,
   loginByDotoriId,
   logout,
-
-  // Profiles (read-only)
   getProfileByDotoriId,
   getAllProfiles,
-
-  // Taste / match
   calculateMatch,
-
-  // Notes
   sendNote
 };
