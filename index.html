@@ -5,16 +5,13 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>DotoriMaps</title>
   
-  <!-- Leaflet CSS -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   
-  <!-- Supabase -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   
   <style>
-    /* 2008 Dotoriverse Theme Applied to Maps */
     :root { 
       --bg: #F5F5F5; --panel: #FFFFFF; --border: #CCCCCC; --pink: #FF9EC4; --pink-dark: #E87BA8; 
       --acorn-dark: #8B5E2E; --cream: #FFF8F0; --text: #333333; --blue: #A8D8FF;
@@ -40,10 +37,14 @@
     .cat-btn i { font-size: 20px; color: var(--acorn-dark); margin-bottom: 6px; display: block; }
     .cat-btn span { font-size: 11px; font-weight: bold; color: var(--text); }
 
-    .recommendation-title { font-size: 14px; font-weight: bold; color: var(--acorn-dark); margin-top: 10px; margin-bottom: -8px; }
+    .recommendation-title { font-size: 14px; font-weight: bold; color: var(--acorn-dark); margin-top: 10px; margin-bottom: 2px; }
     
+    /* Spinner */
+    .spinner { border: 3px solid #f3f3f3; border-top: 3px solid var(--pink); border-radius: 50%; width: 24px; height: 24px; animation: spin 1s linear infinite; margin: 20px auto; }
+    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
     /* Results List */
-    .place-card { background: #FFF; border: 1px solid var(--border); border-radius: 8px; padding: 12px; cursor: pointer; transition: 0.2s; }
+    .place-card { background: #FFF; border: 1px solid var(--border); border-radius: 8px; padding: 12px; cursor: pointer; transition: 0.2s; margin-bottom: 8px; }
     .place-card:hover { border-color: var(--pink); box-shadow: 0 2px 8px rgba(232, 123, 168, 0.15); }
     .place-card h4 { font-size: 13px; color: var(--acorn-dark); margin-bottom: 4px; }
     .place-card p { font-size: 11px; color: #888; }
@@ -57,7 +58,7 @@
     .search-result-item { padding: 12px; font-size: 12px; border-bottom: 1px solid #EEE; cursor: pointer; }
     .search-result-item:hover { background: var(--cream); color: var(--pink-dark); }
 
-    .dotori-btn { padding: 14px; background: linear-gradient(to bottom, #FFB8D4, var(--pink)); border: 1px solid var(--pink-dark); border-radius: 8px; color: #FFF; font-weight: bold; font-size: 14px; cursor: pointer; margin-top: auto; text-shadow: 0 1px 0 rgba(232, 123, 168, 0.4); }
+    .dotori-btn { padding: 14px; background: linear-gradient(to bottom, #FFB8D4, var(--pink)); border: 1px solid var(--pink-dark); border-radius: 8px; color: #FFF; font-weight: bold; font-size: 14px; cursor: pointer; margin-top: auto; text-shadow: 0 1px 0 rgba(232, 123, 168, 0.4); width: 100%;}
     .dotori-btn:hover { background: linear-gradient(to bottom, var(--pink), var(--pink-dark)); }
     
     /* Map */
@@ -68,6 +69,15 @@
     .toolbox-btn { padding: 12px 14px; background: #FFF; border: none; border-bottom: 1px solid var(--border); cursor: pointer; font-size: 16px; color: var(--text); }
     .toolbox-btn:hover { background: var(--cream); }
     
+    /* Map Detail Panel (Bottom Sheet) */
+    .detail-panel { position: absolute; bottom: -100%; left: 360px; right: 0; background: #FFF; border-top: 2px solid var(--pink); padding: 24px; z-index: 1000; transition: bottom 0.3s ease-in-out; box-shadow: 0 -4px 12px rgba(0,0,0,0.1); display: flex; flex-direction: column; gap: 8px; }
+    .detail-panel.open { bottom: 0; }
+    .detail-close { position: absolute; top: 12px; right: 16px; background: none; border: none; font-size: 20px; cursor: pointer; color: #888; }
+    .detail-title { font-size: 22px; font-weight: bold; color: var(--acorn-dark); }
+    .detail-subtitle { font-size: 13px; color: #666; }
+    .detail-actions { display: flex; gap: 10px; margin-top: 10px; }
+    .detail-actions .dotori-btn { width: auto; padding: 10px 20px; }
+
     .leaflet-routing-container { display: none !important; }
     .acorn-marker div { width: 18px; height: 18px; background: #C68B4A; border: 3px solid #fff; border-radius: 50%; box-shadow: 0 2px 6px rgba(0,0,0,0.35); }
   </style>
@@ -92,9 +102,9 @@
         <div class="cat-btn" onclick="findNearby('supermarket')"><i class="fa-solid fa-bag-shopping"></i><span>Shopping</span></div>
       </div>
       
-      <div class="recommendation-title" id="nearby-title">🌰 Nearby Recommendations</div>
+      <div class="recommendation-title" id="nearby-title">🌰 Discover Nearby</div>
       <div id="nearby-list">
-        <p style="font-size: 11px; color: #888; text-align: center; padding: 20px;">Click a category above to find places near you.</p>
+        <p style="font-size: 11px; color: #888; text-align: center; padding: 20px;">Select a category above to explore.</p>
       </div>
     </div>
 
@@ -125,6 +135,16 @@
 
   <!-- Map Container -->
   <div id="map"></div>
+
+  <!-- Detail Panel (Bottom Sheet) -->
+  <div id="detail-panel" class="detail-panel">
+    <button class="detail-close" onclick="closeDetailPanel()">✕</button>
+    <div class="detail-title" id="detail-name">Place Name</div>
+    <div class="detail-subtitle" id="detail-info">Category · Distance</div>
+    <div class="detail-actions">
+      <button class="dotori-btn" onclick="routeToSelected()"><i class="fa-solid fa-diamond-turn-right"></i> Directions</button>
+    </div>
+  </div>
 
   <!-- Floating Toolbox -->
   <div class="map-toolbox">

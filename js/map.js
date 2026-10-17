@@ -1,145 +1,134 @@
 // ============================================
-// DotoriMaps - Map & Auth Logic
+// DotoriMaps - Complete Logic
 // ============================================
 
-// 1. Init Map (Center on Seoul)
-const map = L.map('map', { 
-  zoomControl: false, // We use our own custom buttons
-  rotate: false       // Keeps the map North-Up
-}).setView([37.5665, 126.9780], 13);
-
-L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { 
-  maxZoom: 19, 
-  attribution: '&copy; OpenStreetMap contributors' 
-}).addTo(map);
+const map = L.map('map', { zoomControl: false, rotate: false }).setView([37.5665, 126.9780], 13);
+L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '&copy; OpenStreetMap' }).addTo(map);
 
 const acornIcon = L.divIcon({ className: 'acorn-marker', html: '<div></div>', iconSize: [18, 18], iconAnchor: [9, 9] });
-let userLocationMarker = null;
-let userAccuracyCircle = null;
+let currentMarker = null;
+let selectedPlaceData = null;
 
-// 2. Tab Switching
+// 1. Tab Switching
 function switchTab(event, tabName) {
   document.querySelectorAll('.sidebar-tab').forEach(t => t.classList.remove('active'));
   document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
   if (event && event.currentTarget) event.currentTarget.classList.add('active');
-  const targetTab = document.getElementById(`tab-${tabName}`);
-  if (targetTab) targetTab.classList.add('active');
+  document.getElementById(`tab-${tabName}`).classList.add('active');
+  closeDetailPanel();
 }
 
-// 3. Find My Location (Geolocation)
+// 2. Find My Location
 function findMyLocation() {
-  if (!navigator.geolocation) {
-    return alert('이 브라우저는 위치 기능을 지원하지 않습니다.');
-  }
-  
+  if (!navigator.geolocation) return alert('Geolocation not supported');
   const btn = document.getElementById('locate-btn');
   btn.innerText = '⏳';
 
   navigator.geolocation.getCurrentPosition(
-    (position) => {
-      const lat = position.coords.latitude;
-      const lng = position.coords.longitude;
-      const accuracy = position.coords.accuracy;
-
-      // Center map on user
-      map.flyTo([lat, lng], 16, { duration: 1.5 });
-
-      // Remove old markers if they exist
-      if (userLocationMarker) map.removeLayer(userLocationMarker);
-      if (userAccuracyCircle) map.removeLayer(userAccuracyCircle);
-
-      // Add accuracy circle (shows margin of error)
-      userAccuracyCircle = L.circle([lat, lng], {
-        radius: accuracy,
-        color: '#FF9EC4',
-        fillColor: '#FF9EC4',
-        fillOpacity: 0.15,
-        weight: 1
-      }).addTo(map);
-
-      // Add user marker
-      userLocationMarker = L.marker([lat, lng], { icon: acornIcon })
-        .addTo(map)
-        .bindPopup('📍 내 위치 (You are here)')
-        .openPopup();
-
+    (pos) => {
+      map.flyTo([pos.coords.latitude, pos.coords.longitude], 16, { duration: 1.5 });
+      if (currentMarker) map.removeLayer(currentMarker);
+      currentMarker = L.marker([pos.coords.latitude, pos.coords.longitude], { icon: acornIcon }).addTo(map).bindPopup('📍 You are here').openPopup();
       btn.innerText = '📍';
     },
-    (err) => {
-      alert('위치를 가져올 수 없습니다. 권한을 확인해주세요.');
-      btn.innerText = '📍';
-    },
-    { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
+    (err) => { alert('Could not get location.'); btn.innerText = '📍'; },
+    { enableHighAccuracy: true }
   );
 }
 
-// 4. Find Nearby Places (Overpass API)
+// 3. Find Nearby (Overpass API with Fallbacks)
 async function findNearby(category) {
   const listContainer = document.getElementById('nearby-list');
   const title = document.getElementById('nearby-title');
   
-  listContainer.innerHTML = '<p style="font-size: 11px; color: #888; text-align: center; padding: 20px;">Searching...</p>';
+  listContainer.innerHTML = '<div class="spinner"></div>';
   
-  // Get map center
   const center = map.getCenter();
   const lat = center.lat;
   const lng = center.lng;
-  const radius = 1500; // Search within 1.5km
+  const radius = 2000; // 2km radius
 
-  // Map our categories to OSM tags
-  let osmTag = '';
-  let label = '';
+  let osmTag = '', label = '';
   if (category === 'restaurant') { osmTag = 'amenity=restaurant'; label = 'Restaurants'; }
   else if (category === 'cafe') { osmTag = 'amenity=cafe'; label = 'Cafes'; }
-  else if (category === 'transit_station') { osmTag = 'public_transport=station'; label = 'Transit Stations'; }
-  else if (category === 'supermarket') { osmTag = 'shop=supermarket'; label = 'Supermarkets'; }
+  else if (category === 'transit_station') { osmTag = 'public_transport=station'; label = 'Transit'; }
+  else if (category === 'supermarket') { osmTag = 'shop=supermarket'; label = 'Shopping'; }
 
   title.innerText = `🌰 Nearby ${label}`;
 
-  // Overpass API Query
-  const query = `
-    [out:json];
-    node[${osmTag}](around:${radius},${lat},${lng});
-    out body 15;
-  `;
+  const query = `[out:json];node[${osmTag}](around:${radius},${lat},${lng});out body 20;`;
   
-  try {
-    const res = await fetch('https://overpass-api.de/api/interpreter', {
-      method: 'POST',
-      body: query
-    });
-    const data = await res.json();
-    
-    if (data.elements && data.elements.length > 0) {
-      listContainer.innerHTML = ''; // Clear loading
+  // We try two different Overpass servers to ensure it doesn't fail
+  const endpoints = [
+    'https://overpass-api.de/api/interpreter',
+    'https://overpass.kumi.systems/api/interpreter'
+  ];
+
+  let data = null;
+  for (let url of endpoints) {
+    try {
+      const res = await fetch(url, { method: 'POST', body: query });
+      if (!res.ok) continue;
+      data = await res.json();
+      if (data && data.elements) break;
+    } catch (e) { console.warn(`Failed fetching from ${url}`); }
+  }
+  
+  if (data && data.elements && data.elements.length > 0) {
+    listContainer.innerHTML = '';
+    // Sort by distance
+    const places = data.elements.map(place => {
+      place.distance = map.distance([lat, lng], [place.lat, place.lon]);
+      return place;
+    }).sort((a, b) => a.distance - b.distance);
+
+    places.forEach(place => {
+      const name = place.tags.name || 'Unnamed Place';
+      const distance = place.distance > 1000 ? (place.distance/1000).toFixed(1) + 'km' : place.distance.toFixed(0) + 'm';
       
-      data.elements.forEach(place => {
-        const name = place.tags.name || 'Unnamed Place';
-        const distance = map.distance([lat, lng], [place.lat, place.lon]).toFixed(0);
-        
-        // Create card
-        const card = document.createElement('div');
-        card.className = 'place-card';
-        card.innerHTML = `
-          <h4>${name}</h4>
-          <p>${label} · ${distance}m away</p>
-        `;
-        card.onclick = () => {
-          map.flyTo([place.lat, place.lon], 17);
-          L.marker([place.lat, place.lon], { icon: acornIcon }).addTo(map).bindPopup(name).openPopup();
-        };
-        listContainer.appendChild(card);
-      });
-    } else {
-      listContainer.innerHTML = '<p style="font-size: 11px; color: #888; text-align: center; padding: 20px;">No places found nearby.</p>';
-    }
-  } catch (err) {
-    console.error(err);
-    listContainer.innerHTML = '<p style="font-size: 11px; color: #888; text-align: center; padding: 20px;">Error loading places.</p>';
+      const card = document.createElement('div');
+      card.className = 'place-card';
+      card.innerHTML = `<h4>${name}</h4><p>${label} · ${distance} away</p>`;
+      card.onclick = () => showDetailPanel(place, name, label, distance);
+      listContainer.appendChild(card);
+    });
+  } else {
+    listContainer.innerHTML = '<p style="font-size: 11px; color: #888; text-align: center; padding: 20px;">No places found nearby.</p>';
   }
 }
 
-// 5. Standard Search Logic
+// 4. Detail Panel Logic
+function showDetailPanel(place, name, category, distance) {
+  selectedPlaceData = { lat: place.lat, lon: place.lon, name: name };
+  
+  // Fly to map
+  map.flyTo([place.lat, place.lon], 17, { duration: 1 });
+  
+  // Drop Pin
+  if (currentMarker) map.removeLayer(currentMarker);
+  currentMarker = L.marker([place.lat, place.lon], { icon: acornIcon }).addTo(map).bindPopup(name).openPopup();
+
+  // Fill panel
+  document.getElementById('detail-name').innerText = name;
+  document.getElementById('detail-info').innerText = `${category} · ${distance} away`;
+  
+  // Open panel
+  document.getElementById('detail-panel').classList.add('open');
+}
+
+function closeDetailPanel() {
+  document.getElementById('detail-panel').classList.remove('open');
+}
+
+function routeToSelected() {
+  if (!selectedPlaceData) return;
+  switchTab(null, 'directions');
+  document.getElementById('end-input').value = selectedPlaceData.name;
+  // Optionally auto-fill start with user location if we have it
+  closeDetailPanel();
+}
+
+// 5. Fast Search (Debounced)
 let searchTimeout;
 async function searchLocations(query, resultContainerId) {
   const container = document.getElementById(resultContainerId);
@@ -158,7 +147,7 @@ async function searchLocations(query, resultContainerId) {
       
       if (data && data.length > 0) {
         container.innerHTML = data.map(item => `
-          <div class="search-result-item" onclick="selectLocation(${item.lat}, ${item.lon}, '${item.display_name.replace(/'/g, "\\'")}', '${resultContainerId}')">
+          <div class="search-result-item" onclick="selectSearchResult(${item.lat}, ${item.lon}, '${item.display_name.replace(/'/g, "\\'")}', '${resultContainerId}')">
             ${item.display_name}
           </div>
         `).join('');
@@ -168,19 +157,24 @@ async function searchLocations(query, resultContainerId) {
     } catch (err) {
       container.innerHTML = '<div class="search-result-item">Error searching</div>';
     }
-  }, 600);
+  }, 400); // 400ms debounce (faster than 600ms)
 }
 
-function selectLocation(lat, lon, name, containerId) {
+function selectSearchResult(lat, lon, name, containerId) {
   map.flyTo([lat, lon], 16);
-  L.marker([lat, lon], { icon: acornIcon }).addTo(map).bindPopup(name).openPopup();
+  
+  if (currentMarker) map.removeLayer(currentMarker);
+  currentMarker = L.marker([lat, lon], { icon: acornIcon }).addTo(map).bindPopup(name).openPopup();
   
   const inputId = containerId.replace('-results', '-input');
   document.getElementById(inputId).value = name.split(',')[0];
   document.getElementById(containerId).style.display = 'none';
+  
+  // Show detail panel for searched result
+  showDetailPanel({ lat, lon }, name.split(',')[0], 'Location', '');
 }
 
-// 6. Directions Logic
+// 6. Routing
 async function getDirections() {
   const start = document.getElementById('start-input').value;
   const end = document.getElementById('end-input').value;
@@ -196,7 +190,7 @@ async function getDirections() {
   const endCoords = await fetchCoords(end);
 
   if (startCoords && endCoords) {
-    const routingControl = L.Routing.control({
+    L.Routing.control({
       waypoints: [L.latLng(...startCoords), L.latLng(...endCoords)],
       router: L.Routing.osrmv1({ serviceUrl: 'https://router.project-osrm.org/route/v1' }),
       lineOptions: { styles: [{ color: '#FF9EC4', weight: 5, opacity: 0.8 }] },
@@ -207,7 +201,7 @@ async function getDirections() {
   }
 }
 
-// 7. Authentication Logic (Same as before)
+// 7. Auth (Unchanged)
 window.addEventListener('DOMContentLoaded', async () => {
   try {
     const profile = await DotoriStorage.getMyAcorn();
@@ -217,40 +211,22 @@ window.addEventListener('DOMContentLoaded', async () => {
 
 function updateMapLoginButton(profile) {
   const btn = document.getElementById('map-login-btn');
-  if (profile) {
-    btn.innerText = profile.mini_me || '🌰';
-    btn.title = `Logged in as ${profile.nickname}`;
-    btn.style.background = '#FFF8F0'; 
-  } else {
-    btn.innerText = '👤';
-    btn.title = 'Login';
-    btn.style.background = '#FFF';
-  }
+  if (profile) { btn.innerText = profile.mini_me || '🌰'; btn.style.background = '#FFF8F0'; }
+  else { btn.innerText = '👤'; btn.style.background = '#FFF'; }
 }
 
 function openMapLogin() {
   const savedId = localStorage.getItem('dotori_my_id');
   if (savedId) {
-    if (confirm(`Logged in as ${savedId}. Do you want to log out?`)) {
-      DotoriStorage.logout().then(() => {
-        updateMapLoginButton(null);
-        alert('Logged out.');
-      });
+    if (confirm(`Logged in as ${savedId}. Log out?`)) {
+      DotoriStorage.logout().then(() => { updateMapLoginButton(null); alert('Logged out.'); });
     }
     return;
   }
-
-  const id = prompt("Enter your Dotori ID (e.g., dotori-xxxx):");
+  const id = prompt("Enter your Dotori ID:");
   if (!id) return;
-
   DotoriStorage.loginByDotoriId(id).then(profile => {
-    if (profile) {
-      updateMapLoginButton(profile);
-      alert(`Welcome back, ${profile.nickname}!`);
-    } else {
-      alert('ID not found. Please check your spelling.');
-    }
-  }).catch(err => {
-    alert('Login failed: ' + err.message);
-  });
+    if (profile) { updateMapLoginButton(profile); alert(`Welcome, ${profile.nickname}!`); }
+    else { alert('ID not found.'); }
+  }).catch(err => alert('Login failed: ' + err.message));
 }
