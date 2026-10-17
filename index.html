@@ -12,81 +12,145 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   
   <style>
-    :root { 
-      --bg: #F5F5F5; --panel: #FFFFFF; --border: #CCCCCC; --pink: #FF9EC4; --pink-dark: #E87BA8; 
-      --acorn-dark: #8B5E2E; --cream: #FFF8F0; --text: #333333; --blue: #A8D8FF;
-    }
-    
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    html, body { height: 100vh; width: 100vw; font-family: 'Dotum', 'Malgun Gothic', sans-serif; background: var(--bg); overflow: hidden; display: flex; }
-    
-    /* Sidebar */
-    .sidebar { width: 360px; height: 100%; background: var(--panel); border-right: 1px solid var(--border); display: flex; flex-direction: column; z-index: 1000; box-shadow: 2px 0 10px rgba(0,0,0,0.05); }
-    .sidebar-header { background: linear-gradient(to bottom, #FFB8D4, var(--pink)); color: #FFF; padding: 16px; font-size: 20px; font-weight: bold; text-align: center; border-bottom: 2px solid var(--pink-dark); text-shadow: 0 1px 0 rgba(232, 123, 168, 0.4); }
-    .sidebar-tabs { display: flex; border-bottom: 1px solid var(--border); background: var(--cream); }
-    .sidebar-tab { flex: 1; padding: 12px 0; text-align: center; font-size: 13px; font-weight: bold; color: #888; cursor: pointer; border-bottom: 3px solid transparent; transition: 0.2s; }
-    .sidebar-tab.active { color: var(--pink-dark); border-bottom-color: var(--pink); background: #FFF; }
-    
-    .tab-content { flex: 1; overflow-y: auto; padding: 16px; display: none; flex-direction: column; gap: 16px; }
-    .tab-content.active { display: flex; }
-    
-    /* Tools Grid */
-    .category-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; text-align: center; }
-    .cat-btn { background: var(--cream); border: 1px solid var(--border); border-radius: 8px; padding: 12px 0; cursor: pointer; transition: 0.2s; }
-    .cat-btn:hover { background: #FFEEDD; border-color: var(--pink); transform: translateY(-1px); }
-    .cat-btn i { font-size: 20px; color: var(--acorn-dark); margin-bottom: 6px; display: block; }
-    .cat-btn span { font-size: 11px; font-weight: bold; color: var(--text); }
+  :root {
+    --bg: #F5F5F5; --panel: #FFFFFF; --border: #CCCCCC; --border-dark: #999999;
+    --pink: #FF9EC4; --pink-dark: #E87BA8;
+    --acorn-dark: #8B5E2E; --acorn: #C68B4A;
+    --cream: #FFF8F0; --cream-dark: #F0E4D4;
+    --text: #333333; --text-light: #888888;
+    --blue: #A8D8FF;
+  }
 
-    .recommendation-title { font-size: 14px; font-weight: bold; color: var(--acorn-dark); margin-top: 10px; margin-bottom: 2px; }
-    
-    /* Spinner */
-    .spinner { border: 3px solid #f3f3f3; border-top: 3px solid var(--pink); border-radius: 50%; width: 24px; height: 24px; animation: spin 1s linear infinite; margin: 20px auto; }
-    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    height: 100vh; width: 100vw;
+    font-family: 'Dotum', 'Malgun Gothic', sans-serif;
+    background: var(--bg); overflow: hidden; display: flex;
+  }
 
-    /* Results List */
-    .place-card { background: #FFF; border: 1px solid var(--border); border-radius: 8px; padding: 12px; cursor: pointer; transition: 0.2s; margin-bottom: 8px; }
-    .place-card:hover { border-color: var(--pink); box-shadow: 0 2px 8px rgba(232, 123, 168, 0.15); }
-    .place-card h4 { font-size: 13px; color: var(--acorn-dark); margin-bottom: 4px; }
-    .place-card p { font-size: 11px; color: #888; }
-    
-    /* Inputs */
-    .input-group { display: flex; flex-direction: column; gap: 6px; position: relative; }
-    .input-group label { font-size: 12px; color: var(--acorn-dark); font-weight: bold; }
-    .search-box { width: 100%; padding: 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--cream); font-size: 13px; outline: none; }
-    .search-box:focus { border-color: var(--pink); background: #FFF; }
-    .search-results-list { position: absolute; top: 100%; left: 0; right: 0; background: #FFF; border: 1px solid var(--border); border-radius: 8px; max-height: 200px; overflow-y: auto; z-index: 1010; display: none; flex-direction: column; margin-top: 4px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
-    .search-result-item { padding: 12px; font-size: 12px; border-bottom: 1px solid #EEE; cursor: pointer; }
-    .search-result-item:hover { background: var(--cream); color: var(--pink-dark); }
+  /* Sidebar */
+  .sidebar { width: 380px; height: 100%; background: var(--panel); border-right: 1px solid var(--border); display: flex; flex-direction: column; z-index: 1000; box-shadow: 2px 0 10px rgba(0,0,0,0.05); }
+  .sidebar-header { background: linear-gradient(to bottom, #FFB8D4, var(--pink)); color: #FFF; padding: 16px; font-size: 20px; font-weight: bold; text-align: center; border-bottom: 2px solid var(--pink-dark); text-shadow: 0 1px 0 rgba(232, 123, 168, 0.4); }
+  .sidebar-tabs { display: flex; border-bottom: 1px solid var(--border); background: var(--cream); }
+  .sidebar-tab { flex: 1; padding: 12px 0; text-align: center; font-size: 13px; font-weight: bold; color: #888; cursor: pointer; border-bottom: 3px solid transparent; transition: 0.2s; user-select: none; }
+  .sidebar-tab.active { color: var(--pink-dark); border-bottom-color: var(--pink); background: #FFF; }
 
-    .dotori-btn { padding: 14px; background: linear-gradient(to bottom, #FFB8D4, var(--pink)); border: 1px solid var(--pink-dark); border-radius: 8px; color: #FFF; font-weight: bold; font-size: 14px; cursor: pointer; margin-top: auto; text-shadow: 0 1px 0 rgba(232, 123, 168, 0.4); width: 100%;}
-    .dotori-btn:hover { background: linear-gradient(to bottom, var(--pink), var(--pink-dark)); }
-    
-    /* Map */
-    #map { flex: 1; height: 100%; width: 100%; z-index: 1; background: #e5e3df; }
-    
-    /* Toolbox */
-    .map-toolbox { position: absolute; top: 16px; right: 16px; z-index: 1000; background: #FFF; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); display: flex; flex-direction: column; overflow: hidden; border: 1px solid var(--border); }
-    .toolbox-btn { padding: 12px 14px; background: #FFF; border: none; border-bottom: 1px solid var(--border); cursor: pointer; font-size: 16px; color: var(--text); }
-    .toolbox-btn:hover { background: var(--cream); }
-    
-    /* Map Detail Panel (Bottom Sheet) */
-    .detail-panel { position: absolute; bottom: -100%; left: 360px; right: 0; background: #FFF; border-top: 2px solid var(--pink); padding: 24px; z-index: 1000; transition: bottom 0.3s ease-in-out; box-shadow: 0 -4px 12px rgba(0,0,0,0.1); display: flex; flex-direction: column; gap: 8px; }
-    .detail-panel.open { bottom: 0; }
-    .detail-close { position: absolute; top: 12px; right: 16px; background: none; border: none; font-size: 20px; cursor: pointer; color: #888; }
-    .detail-title { font-size: 22px; font-weight: bold; color: var(--acorn-dark); }
-    .detail-subtitle { font-size: 13px; color: #666; }
-    .detail-actions { display: flex; gap: 10px; margin-top: 10px; }
-    .detail-actions .dotori-btn { width: auto; padding: 10px 20px; }
+  .tab-content { flex: 1; overflow-y: auto; padding: 16px; display: none; flex-direction: column; gap: 14px; }
+  .tab-content.active { display: flex; }
 
-    .leaflet-routing-container { display: none !important; }
-    .acorn-marker div { width: 18px; height: 18px; background: #C68B4A; border: 3px solid #fff; border-radius: 50%; box-shadow: 0 2px 6px rgba(0,0,0,0.35); }
-    @media (max-width: 720px) {
+  /* Category grid */
+  .category-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; text-align: center; }
+  .cat-btn { background: var(--cream); border: 1px solid var(--border); border-radius: 8px; padding: 10px 0; cursor: pointer; transition: 0.15s; user-select: none; }
+  .cat-btn:hover { background: #FFEEDD; border-color: var(--pink); transform: translateY(-1px); }
+  .cat-btn i { font-size: 18px; color: var(--acorn-dark); margin-bottom: 4px; display: block; }
+  .cat-btn span { font-size: 10px; font-weight: bold; color: var(--text); }
+
+  .recommendation-title { font-size: 14px; font-weight: bold; color: var(--acorn-dark); margin-top: 6px; margin-bottom: 2px; display: flex; justify-content: space-between; align-items: center; }
+  .recommendation-title .sort-chips { display: flex; gap: 4px; }
+  .sort-chip { font-size: 10px; padding: 3px 8px; border-radius: 10px; border: 1px solid var(--border); background: #FFF; cursor: pointer; color: var(--text-light); }
+  .sort-chip.active { background: var(--pink); border-color: var(--pink-dark); color: #FFF; font-weight: bold; }
+
+  /* Spinner */
+  .spinner { border: 3px solid #f3f3f3; border-top: 3px solid var(--pink); border-radius: 50%; width: 24px; height: 24px; animation: spin 1s linear infinite; margin: 20px auto; }
+  @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+  /* Place cards */
+  .place-card { background: #FFF; border: 1px solid var(--border); border-radius: 8px; padding: 12px; cursor: pointer; transition: 0.15s; margin-bottom: 8px; display: flex; gap: 10px; align-items: flex-start; }
+  .place-card:hover { border-color: var(--pink); box-shadow: 0 2px 8px rgba(232, 123, 168, 0.15); transform: translateY(-1px); }
+  .place-card-icon { width: 32px; height: 32px; border-radius: 8px; background: var(--cream); display: flex; align-items: center; justify-content: center; font-size: 16px; color: var(--acorn-dark); flex-shrink: 0; }
+  .place-card-body { flex: 1; min-width: 0; }
+  .place-card h4 { font-size: 13px; color: var(--acorn-dark); margin-bottom: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .place-card p { font-size: 11px; color: #888; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  /* Inputs */
+  .input-group { display: flex; flex-direction: column; gap: 6px; position: relative; }
+  .input-group label { font-size: 12px; color: var(--acorn-dark); font-weight: bold; }
+  .search-box { width: 100%; padding: 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--cream); font-size: 13px; outline: none; }
+  .search-box:focus { border-color: var(--pink); background: #FFF; }
+  .search-results-list { position: absolute; top: 100%; left: 0; right: 0; background: #FFF; border: 1px solid var(--border); border-radius: 8px; max-height: 220px; overflow-y: auto; z-index: 1010; display: none; flex-direction: column; margin-top: 4px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+  .search-result-item { padding: 10px 12px; font-size: 12px; border-bottom: 1px solid #EEE; cursor: pointer; }
+  .search-result-item:last-child { border-bottom: none; }
+  .search-result-item:hover, .search-result-item.active { background: var(--cream); color: var(--pink-dark); }
+  .search-result-item small { display: block; color: #AAA; font-size: 10px; margin-top: 2px; }
+  .recent-searches { display: flex; flex-wrap: wrap; gap: 6px; }
+  .recent-chip { font-size: 11px; padding: 5px 10px; border-radius: 12px; background: var(--cream); border: 1px solid var(--cream-dark); cursor: pointer; }
+  .recent-chip:hover { background: #FFE8F0; border-color: var(--pink); }
+  .recent-label { font-size: 10px; color: #AAA; letter-spacing: 0.5px; }
+
+  /* Buttons */
+  .dotori-btn { padding: 12px 14px; background: linear-gradient(to bottom, #FFB8D4, var(--pink)); border: 1px solid var(--pink-dark); border-radius: 8px; color: #FFF; font-weight: bold; font-size: 13px; cursor: pointer; text-shadow: 0 1px 0 rgba(232, 123, 168, 0.4); width: 100%; }
+  .dotori-btn:hover { background: linear-gradient(to bottom, var(--pink), var(--pink-dark)); }
+  .dotori-btn:disabled { opacity: 0.6; cursor: wait; }
+
+  /* Map */
+  #map { flex: 1; height: 100%; width: 100%; z-index: 1; background: #e5e3df; }
+
+  /* Toolbox */
+  .map-toolbox { position: absolute; top: 16px; right: 16px; z-index: 1000; background: #FFF; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); display: flex; flex-direction: column; overflow: hidden; border: 1px solid var(--border); }
+  .toolbox-btn { padding: 12px 14px; background: #FFF; border: none; border-bottom: 1px solid var(--border); cursor: pointer; font-size: 16px; color: var(--text); }
+  .toolbox-btn:last-child { border-bottom: none; }
+  .toolbox-btn:hover { background: var(--cream); }
+
+  /* Detail panel */
+  .detail-panel {
+    position: absolute; bottom: -100%; left: 380px; right: 0;
+    background: #FFF; border-top: 2px solid var(--pink);
+    padding: 22px 26px 18px; z-index: 1000;
+    transition: bottom 0.3s ease-in-out;
+    box-shadow: 0 -4px 12px rgba(0,0,0,0.1);
+    display: flex; flex-direction: column; gap: 10px;
+    max-height: 60vh; overflow-y: auto;
+  }
+  .detail-panel.open { bottom: 0; }
+  .detail-close { position: absolute; top: 10px; right: 14px; background: none; border: none; font-size: 22px; cursor: pointer; color: #AAA; }
+  .detail-close:hover { color: var(--pink-dark); }
+
+  .detail-head { display: flex; gap: 16px; align-items: flex-start; }
+  .detail-photo {
+    width: 96px; height: 96px; border-radius: 10px; background: var(--cream);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 44px; color: var(--acorn-dark); flex-shrink: 0;
+    overflow: hidden;
+  }
+  .detail-photo img { width: 100%; height: 100%; object-fit: cover; }
+  .detail-head-text { flex: 1; min-width: 0; }
+  .detail-title { font-size: 22px; font-weight: bold; color: var(--acorn-dark); line-height: 1.2; margin-bottom: 4px; }
+  .detail-category { display: inline-block; font-size: 11px; padding: 2px 8px; border-radius: 10px; background: var(--cream); color: var(--acorn-dark); border: 1px solid var(--cream-dark); margin-bottom: 6px; }
+  .detail-subtitle { font-size: 12px; color: #666; line-height: 1.5; }
+
+  .detail-facts { display: flex; flex-direction: column; gap: 6px; margin-top: 6px; }
+  .detail-fact { display: flex; gap: 8px; font-size: 12px; color: var(--text); align-items: flex-start; }
+  .detail-fact .fact-icon { width: 18px; flex-shrink: 0; color: var(--acorn-dark); text-align: center; }
+  .detail-fact a { color: var(--pink-dark); text-decoration: none; word-break: break-all; }
+  .detail-fact a:hover { text-decoration: underline; }
+  .detail-fact .fact-label { color: #AAA; margin-right: 4px; }
+
+  .detail-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+  .detail-actions .dotori-btn { width: auto; padding: 9px 16px; font-size: 12px; }
+  .detail-actions .small-btn { padding: 8px 14px; font-size: 12px; border-radius: 8px; background: #FFF; border: 1px solid var(--border); color: var(--text); cursor: pointer; }
+  .detail-actions .small-btn:hover { border-color: var(--pink); background: var(--cream); }
+  .detail-actions .small-btn.saved { background: var(--pink); border-color: var(--pink-dark); color: #FFF; }
+
+  .detail-nearby { margin-top: 6px; border-top: 1px solid #EEE; padding-top: 10px; }
+  .detail-nearby-title { font-size: 11px; font-weight: bold; color: var(--acorn-dark); margin-bottom: 6px; letter-spacing: 0.4px; }
+  .detail-nearby-grid { display: flex; flex-wrap: wrap; gap: 6px; }
+  .detail-nearby-chip { font-size: 11px; padding: 5px 10px; border-radius: 12px; background: var(--cream); border: 1px solid var(--cream-dark); cursor: pointer; color: var(--text); }
+  .detail-nearby-chip:hover { background: #FFE8F0; border-color: var(--pink); }
+  .detail-nearby-chip .muted { color: #AAA; margin-left: 4px; }
+
+  /* Leaflet routing */
+  .leaflet-routing-container { display: none !important; }
+  .acorn-marker div { width: 18px; height: 18px; background: #C68B4A; border: 3px solid #fff; border-radius: 50%; box-shadow: 0 2px 6px rgba(0,0,0,0.35); }
+
+  /* Mobile */
+  @media (max-width: 720px) {
     body { flex-direction: column; }
     .sidebar { width: 100vw; height: 45vh; border-right: none; border-bottom: 1px solid var(--border); }
     #map { height: 55vh; flex: none; width: 100%; }
-    .detail-panel { left: 0; }
-    .map-toolbox { top: auto; bottom: 16px; right: 16px; } }
-  </style>
+    .detail-panel { left: 0; max-height: 50vh; }
+    .map-toolbox { top: auto; bottom: 16px; right: 16px; }
+  }
+</style>
 </head>
 <body>
 
@@ -118,8 +182,16 @@
     <div class="tab-content" id="tab-search">
       <div class="input-group">
         <label>Find a place</label>
-        <input type="text" id="search-input" class="search-box" placeholder="e.g. Seoul Station" oninput="searchLocations(this.value, 'search-results')">
+        <input type="text" id="search-input" class="search-box"
+               placeholder="e.g. Seoul Station"
+               autocomplete="off"
+               oninput="searchLocations(this.value, 'search-results')">
         <div id="search-results" class="search-results-list"></div>
+      </div>
+
+      <div class="recent-label">RECENT SEARCHES</div>
+      <div id="recent-searches" class="recent-searches">
+        <span class="recent-chip" style="cursor: default; color: #BBB;">No searches yet</span>
       </div>
     </div>
 
@@ -142,20 +214,28 @@
   <!-- Map Container -->
   <div id="map"></div>
 
-  <!-- Detail Panel (Bottom Sheet) -->
-  <div id="detail-panel" class="detail-panel">
-    <button class="detail-close" onclick="closeDetailPanel()">✕</button>
-    <div class="detail-title" id="detail-name">Place Name</div>
-    <div class="detail-subtitle" id="detail-info">Category · Distance</div>
-    <div class="detail-actions">
-      <button class="dotori-btn" onclick="routeToSelected()"><i class="fa-solid fa-diamond-turn-right"></i> Directions</button>
+    <!-- Search Tab -->
+    <div class="tab-content" id="tab-search">
+      <div class="input-group">
+        <label>Find a place</label>
+        <input type="text" id="search-input" class="search-box"
+               placeholder="e.g. Seoul Station"
+               autocomplete="off"
+               oninput="searchLocations(this.value, 'search-results')">
+        <div id="search-results" class="search-results-list"></div>
+      </div>
+
+      <div class="recent-label">RECENT SEARCHES</div>
+      <div id="recent-searches" class="recent-searches">
+        <span class="recent-chip" style="cursor: default; color: #BBB;">No searches yet</span>
+      </div>
     </div>
-  </div>
 
   <!-- Floating Toolbox -->
   <div class="map-toolbox">
     <button class="toolbox-btn" id="map-login-btn" title="Login">🌰</button>
     <button class="toolbox-btn" id="locate-btn" title="Find My Location">📍</button>
+    <button class="toolbox-btn" id="saved-btn" title="Saved places">🔖</button>
     <button class="toolbox-btn" id="zoom-in" title="Zoom In">➕</button>
     <button class="toolbox-btn" id="zoom-out" title="Zoom Out">➖</button>
   </div>
