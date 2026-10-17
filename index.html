@@ -80,6 +80,12 @@
 
     .leaflet-routing-container { display: none !important; }
     .acorn-marker div { width: 18px; height: 18px; background: #C68B4A; border: 3px solid #fff; border-radius: 50%; box-shadow: 0 2px 6px rgba(0,0,0,0.35); }
+    @media (max-width: 720px) {
+    body { flex-direction: column; }
+    .sidebar { width: 100vw; height: 45vh; border-right: none; border-bottom: 1px solid var(--border); }
+    #map { height: 55vh; flex: none; width: 100%; }
+    .detail-panel { left: 0; }
+    .map-toolbox { top: auto; bottom: 16px; right: 16px; } }
   </style>
 </head>
 <body>
@@ -148,16 +154,16 @@
 
   <!-- Floating Toolbox -->
   <div class="map-toolbox">
-    <button class="toolbox-btn" id="map-login-btn" title="Login" onclick="openMapLogin()">🌰</button>
-    <button class="toolbox-btn" id="locate-btn" title="Find My Location" onclick="findMyLocation()">📍</button>
-    <button class="toolbox-btn" id="zoom-in" title="Zoom In" onclick="map.zoomIn()">➕</button>
-    <button class="toolbox-btn" id="zoom-out" title="Zoom Out" onclick="map.zoomOut()">➖</button>
+    <button class="toolbox-btn" id="map-login-btn" title="Login">🌰</button>
+    <button class="toolbox-btn" id="locate-btn" title="Find My Location">📍</button>
+    <button class="toolbox-btn" id="zoom-in" title="Zoom In">➕</button>
+    <button class="toolbox-btn" id="zoom-out" title="Zoom Out">➖</button>
   </div>
 
   <!-- Scripts -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.js"></script>
-  <script src="js/storage/supabase.js"></script>
-  <script src="js/map.js"></script>
+  <script src="js/storage/supabase.js" defer></script>
+  <script src="js/map.js" defer></script>
 </body>
 </html>
